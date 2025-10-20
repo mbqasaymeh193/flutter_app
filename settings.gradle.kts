@@ -8,7 +8,8 @@ pluginManagement {
             flutterSdkPath
         }
 
-    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+    // ✅ هذا هو المسار الصحيح بناءً على مكان تثبيت Flutter لديك
+    includeBuild("C:/src/flutter/packages/flutter_tools/gradle")
 
     repositories {
         google()
@@ -23,4 +24,5 @@ plugins {
     id("org.jetbrains.kotlin.android") version "2.1.0" apply false
 }
 
+// ✅ لاحظ أن المسار الصحيح للتطبيق هو android/app وليس android:app
 include(":app")
