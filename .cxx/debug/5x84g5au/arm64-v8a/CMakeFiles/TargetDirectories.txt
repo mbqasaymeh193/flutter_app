@@ -1,0 +1,2 @@
+C:/Projects/medical-booking/medical-booking-frontend/flutter_app/.cxx/debug/5x84g5au/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Projects/medical-booking/medical-booking-frontend/flutter_app/.cxx/debug/5x84g5au/arm64-v8a/CMakeFiles/rebuild_cache.dir
