@@ -32,16 +32,15 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = false);
 
     if (result != null && result['token'] != null) {
+      ApiService.token = result['token'];
       // تم تسجيل الدخول بنجاح
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login successful!')),
       );
 
       // الانتقال إلى صفحة الأطباء
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
+      // الانتقال إلى الواجهة الرئيسية التي تحتوي على التنقل السفلي
+    Navigator.pushReplacementNamed(context, '/main');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invalid email or password')),
