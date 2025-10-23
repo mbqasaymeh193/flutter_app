@@ -235,7 +235,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: Text(subtitle),
       value: value,
       onChanged: onChanged,
-      activeColor: const Color(0xFF1E88E5),
+      activeThumbColor: const Color(0xFF1E88E5),
     );
   }
 

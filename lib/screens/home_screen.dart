@@ -19,8 +19,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<List<Doctor>> _loadDoctors() async {
-    final list = await ApiService.getDoctors();
-    return list.map<Doctor>((json) => Doctor.fromJson(json)).toList();
+    try {
+      final list = await ApiService.getDoctors();
+      if (list == null) return [];
+      return list.map<Doctor>((json) => Doctor.fromJson(json)).toList();
+    } catch (e) {
+      debugPrint("🔴 Error loading doctors: $e");
+      return [];
+    }
   }
 
   @override
@@ -35,36 +41,41 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (snapshot.data == null || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No doctors found.'));
-          } else {
-            final doctors = snapshot.data!;
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: doctors.length,
-              itemBuilder: (context, index) {
-                final d = doctors[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    leading: const Icon(Icons.person, color: Colors.blue),
-                    title: Text(d.fullName),
-                    subtitle: Text(d.specialty),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.calendar_today, color: Colors.blueAccent),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Booking with ${d.fullName}...')),
-                        );
-                      },
-                    ),
-                  ),
-                );
-              },
-            );
           }
+
+          if (snapshot.hasError) {
+            return Center(child: Text('❌ Error: ${snapshot.error}'));
+          }
+
+          final doctors = snapshot.data ?? [];
+
+          if (doctors.isEmpty) {
+            return const Center(child: Text('No doctors found.'));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: doctors.length,
+            itemBuilder: (context, index) {
+              final d = doctors[index];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: const Icon(Icons.person, color: Colors.blue),
+                  title: Text(d.fullName),
+                  subtitle: Text(d.specialty),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.calendar_today, color: Colors.blueAccent),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Booking with ${d.fullName}...')),
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+          );
         },
       ),
     );

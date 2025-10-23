@@ -1,3 +1,3 @@
-// ✅ إعداد رابط الـ API الخاص بك
-const String apiBaseUrl = 'https://localhost:7000/api';
-
+class AppConfig {
+  static const String apiBaseUrl = "http://127.0.0.1:7000/api";
+}

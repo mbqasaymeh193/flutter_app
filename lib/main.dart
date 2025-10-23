@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/home_screen.dart';
@@ -25,14 +24,14 @@ class MedicalBookingApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         textTheme: GoogleFonts.poppinsTextTheme(),
         appBarTheme: const AppBarTheme(
-          color: Color(0xFF1E88E5),
+          backgroundColor: Color(0xFF1E88E5),
           centerTitle: true,
           foregroundColor: Colors.white,
         ),
       ),
-      initialRoute: '/',
+      // 👇 اجعل البداية من شاشة تسجيل الدخول مؤقتًا للتجربة
+      initialRoute: '/login',
       routes: {
-        '/': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignUpScreen(),
         '/home': (context) => const HomeScreen(),
