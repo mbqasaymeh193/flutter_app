@@ -32,14 +32,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (result != null && result['token'] != null) {
       ApiService.token = result['token'];
-      // تم تسجيل الدخول بنجاح
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login successful!')),
       );
-
-      // الانتقال إلى صفحة الأطباء
-      // الانتقال إلى الواجهة الرئيسية التي تحتوي على التنقل السفلي
-    Navigator.pushReplacementNamed(context, '/main');
+      Navigator.pushReplacementNamed(context, '/main');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invalid email or password')),
@@ -61,6 +57,8 @@ class _LoginScreenState extends State<LoginScreen> {
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 30),
+
+            // 📧 Email field
             TextField(
               controller: _emailController,
               decoration: const InputDecoration(
@@ -69,6 +67,8 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             const SizedBox(height: 15),
+
+            // 🔒 Password field
             TextField(
               controller: _passwordController,
               obscureText: true,
@@ -77,7 +77,24 @@ class _LoginScreenState extends State<LoginScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
-            const SizedBox(height: 25),
+
+            // 🧭 Forgot Password button
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/forgot-password');
+                },
+                child: const Text(
+                  "Forgot Password?",
+                  style: TextStyle(color: Colors.blue),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            // 🔘 Login button
             _isLoading
                 ? const CircularProgressIndicator()
                 : ElevatedButton(

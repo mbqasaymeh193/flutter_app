@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:healthcare_flutter_app/screens/appointments_screen.dart';
+import 'screens/appointments_screen.dart';
+import 'screens/forgot_password_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
@@ -10,6 +11,7 @@ import 'screens/settings_screen.dart';
 import 'screens/admin_screen.dart';
 import 'screens/payment_screen.dart';
 import 'screens/main_layout.dart';
+import 'screens/reset_password_screen.dart';
 
 void main() {
   runApp(const MedicalBookingApp());
@@ -55,6 +57,8 @@ class MedicalBookingApp extends StatelessWidget {
         '/payment': (context) => const PaymentScreen(),
         '/appointments': (context) => const AppointmentsScreen(),
         '/doctorAppointments': (context) => const AppointmentsScreen(isDoctor: true),
+        '/forgot-password': (context) => const ForgotPasswordScreen(),
+        '/reset-password': (context) => const ResetPasswordScreen(),
       },
     );
   }
