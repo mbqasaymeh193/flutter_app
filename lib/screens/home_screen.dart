@@ -166,6 +166,15 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Doctors List'),
         centerTitle: true,
+        actions: [
+  IconButton(
+    icon: const Icon(Icons.calendar_month),
+    onPressed: () {
+      Navigator.pushNamed(context, '/appointments');
+    },
+  ),
+],
+
       ),
       body: FutureBuilder<List<Doctor>>(
         future: _futureDoctors,

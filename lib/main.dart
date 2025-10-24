@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:healthcare_flutter_app/screens/appointments_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
@@ -52,6 +53,8 @@ class MedicalBookingApp extends StatelessWidget {
         '/settings': (context) => const SettingsScreen(),
         '/admin': (context) => const AdminScreen(),
         '/payment': (context) => const PaymentScreen(),
+        '/appointments': (context) => const AppointmentsScreen(),
+        '/doctorAppointments': (context) => const AppointmentsScreen(isDoctor: true),
       },
     );
   }

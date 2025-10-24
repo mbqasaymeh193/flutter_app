@@ -68,5 +68,57 @@ class ApiService {
       return false;
     }
   }
+  // جلب مواعيد المريض
+  static Future<List<dynamic>?> getMyAppointments() async {
+    try {
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/appointments/my");
+      final response = await http.get(url, headers: {
+        "Authorization": "Bearer $token",
+      });
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print("🔴 getMyAppointments Error: $e");
+      return null;
+    }
+  }
+
+  // جلب مواعيد الطبيب
+  static Future<List<dynamic>?> getDoctorAppointments() async {
+    try {
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/appointments/doctor");
+      final response = await http.get(url, headers: {
+        "Authorization": "Bearer $token",
+      });
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print("🔴 getDoctorAppointments Error: $e");
+      return null;
+    }
+  }
+
+  // تحديث حالة الموعد (قبول / رفض)
+  static Future<bool> updateAppointmentStatus(int id, String status) async {
+    try {
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/appointments/$id/status");
+      final response = await http.put(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode(status),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print("🔴 updateAppointmentStatus Error: $e");
+      return false;
+    }
+  }
 
 }
