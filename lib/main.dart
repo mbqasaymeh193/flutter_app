@@ -59,6 +59,7 @@ class MedicalBookingApp extends StatelessWidget {
         '/doctorAppointments': (context) => const AppointmentsScreen(isDoctor: true),
         '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/reset-password': (context) => const ResetPasswordScreen(),
+        
       },
     );
   }
