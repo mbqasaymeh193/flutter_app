@@ -19,7 +19,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final result = await ApiService.changePassword(oldPass.text, newPass.text);
     setState(() {
       loading = false;
-      message = result?['message'] ?? 'Failed to change password';
+      message = result['message'] ?? 'Failed to change password';
     });
   }
 
