@@ -1,0 +1,49 @@
+import 'package:flutter/material.dart';
+import '../widgets/custom_app_bar.dart';
+
+class PatientBookAppointmentScreen extends StatelessWidget {
+  const PatientBookAppointmentScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final TextEditingController _dateController = TextEditingController();
+
+    return Scaffold(
+      appBar: const CustomAppBar(title: 'حجز موعد جديد'),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TextField(
+              decoration: const InputDecoration(labelText: 'اختر الطبيب'),
+              onTap: () {},
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _dateController,
+              decoration: const InputDecoration(labelText: 'اختر التاريخ'),
+              onTap: () async {
+                DateTime? picked = await showDatePicker(
+                  context: context,
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime(2026),
+                  initialDate: DateTime.now(),
+                );
+                if (picked != null) {
+                  _dateController.text = "${picked.year}-${picked.month}-${picked.day}";
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                // استدعاء API لحجز الموعد
+              },
+              child: const Text('تأكيد الحجز'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
