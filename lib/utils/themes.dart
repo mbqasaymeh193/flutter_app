@@ -1,25 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'constants.dart';
 
-class AppTheme {
-  static final ThemeData lightTheme = ThemeData(
-    primaryColor: AppColors.primary,
-    scaffoldBackgroundColor: AppColors.background,
-    textTheme: GoogleFonts.poppinsTextTheme(),
-    appBarTheme: const AppBarTheme(
-      backgroundColor: AppColors.primary,
-      centerTitle: true,
+final ThemeData appTheme = ThemeData(
+  primarySwatch: Colors.blue,
+  scaffoldBackgroundColor: const Color(0xFFF7F9FC),
+  textTheme: GoogleFonts.poppinsTextTheme(),
+  appBarTheme: const AppBarTheme(
+    backgroundColor: Color(0xFF1976D2),
+    centerTitle: true,
+    foregroundColor: Colors.white,
+  ),
+  elevatedButtonTheme: ElevatedButtonThemeData(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: const Color(0xFF1976D2),
       foregroundColor: Colors.white,
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
       ),
     ),
-  );
-}
+  ),
+);

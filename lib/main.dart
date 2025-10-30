@@ -1,42 +1,32 @@
 import 'package:flutter/material.dart';
-import 'screens/splash/splash_screen.dart';
-import 'screens/auth/login_screen.dart';
-import 'screens/auth/register_screen.dart';
-import 'screens/auth/forgot_password_screen.dart';
-import 'screens/auth/reset_password_screen.dart';
-
-// placeholder home routes (ستستبدلها لاحقًا بالشاشات التفصيلية حسب الدور)
-import 'screens/patient/patient_home_screen.dart';
-import 'screens/doctor/home_doctor_screen.dart';
-import 'screens/admin/admin_home_screen.dart';
+import 'package:flutter_app/core/routes/app_routes.dart';
+import 'package:flutter_app/core/theme/app_colors.dart';
 
 void main() {
-  runApp(const MedicalBookingApp());
+  runApp(const HospitalApp());
 }
 
-class MedicalBookingApp extends StatelessWidget {
-  const MedicalBookingApp({super.key});
+class HospitalApp extends StatelessWidget {
+  const HospitalApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Medical Booking',
+      title: 'نظام المستشفى',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primaryColor: const Color(0xFF1976D2),
-        useMaterial3: true,
+        primaryColor: AppColors.primary,
+        scaffoldBackgroundColor: Colors.white,
+        fontFamily: 'Cairo',
+        appBarTheme: const AppBarTheme(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+        ),
       ),
-      routes: {
-        '/splash': (_) => const SplashScreen(),
-        '/login': (_) => const LoginScreen(),
-        '/signup': (_) => const RegisterScreen(),
-        '/forgot-password': (_) => const ForgotPasswordScreen(),
-        '/reset-password': (_) => const ResetPasswordScreen(),
-        '/patient-home': (_) => const PatientHomeScreen(),
-        '/doctor-home': (_) => const DoctorHomeScreen(),
-        '/admin-home': (_) => const AdminHomeScreen(),
-      },
-      initialRoute: '/splash',
+      initialRoute: AppRoutes.doctorDashboard, // يمكنك تغييره مثل: AppRoutes.patientDashboard
+      onGenerateRoute: AppRoutes.generateRoute,
     );
   }
 }

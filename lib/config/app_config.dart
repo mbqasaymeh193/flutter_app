@@ -1,1 +1,4 @@
-// TODO Implement this library.
+class AppConfig {
+  // 🔹 رابط الـ API الأساسي (تأكد من تغيير الـ IP إذا استخدمت جهاز حقيقي)
+  static const String apiBaseUrl = "http://127.0.0.1:7000/api";
+}

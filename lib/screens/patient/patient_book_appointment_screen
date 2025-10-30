@@ -1,46 +1,89 @@
 import 'package:flutter/material.dart';
-import '../widgets/custom_app_bar.dart';
+import '../../services/api_service.dart';
+import '../../widgets/custom_button.dart';
+import '../../widgets/custom_textfield.dart';
 
-class PatientBookAppointmentScreen extends StatelessWidget {
-  const PatientBookAppointmentScreen({super.key});
+class BookAppointmentScreen extends StatefulWidget {
+  final dynamic doctor;
+  const BookAppointmentScreen({super.key, required this.doctor});
+
+  @override
+  State<BookAppointmentScreen> createState() => _BookAppointmentScreenState();
+}
+
+class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
+  DateTime? selectedDate;
+  TimeOfDay? selectedTime;
+  bool _loading = false;
+
+  Future<void> pickDate() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (date != null) setState(() => selectedDate = date);
+  }
+
+  Future<void> pickTime() async {
+    final time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    if (time != null) setState(() => selectedTime = time);
+  }
+
+  Future<void> bookAppointment() async {
+    if (selectedDate == null || selectedTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select date and time")),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    final start = DateTime(
+      selectedDate!.year,
+      selectedDate!.month,
+      selectedDate!.day,
+      selectedTime!.hour,
+      selectedTime!.minute,
+    );
+    final end = start.add(const Duration(minutes: 30));
+
+    final success = await ApiService.bookAppointment(
+      doctorId: widget.doctor['id'],
+      startsAt: start,
+      endsAt: end,
+    );
+
+    setState(() => _loading = false);
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Appointment booked successfully")),
+      );
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to book appointment")),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final TextEditingController _dateController = TextEditingController();
-
     return Scaffold(
-      appBar: const CustomAppBar(title: 'حجز موعد جديد'),
+      appBar: AppBar(title: Text("Book ${widget.doctor['fullName']}")),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            TextField(
-              decoration: const InputDecoration(labelText: 'اختر الطبيب'),
-              onTap: () {},
-            ),
+            CustomButton(text: selectedDate == null ? "Pick Date" : selectedDate!.toLocal().toString().split(' ')[0], onPressed: pickDate),
             const SizedBox(height: 16),
-            TextField(
-              controller: _dateController,
-              decoration: const InputDecoration(labelText: 'اختر التاريخ'),
-              onTap: () async {
-                DateTime? picked = await showDatePicker(
-                  context: context,
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime(2026),
-                  initialDate: DateTime.now(),
-                );
-                if (picked != null) {
-                  _dateController.text = "${picked.year}-${picked.month}-${picked.day}";
-                }
-              },
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                // استدعاء API لحجز الموعد
-              },
-              child: const Text('تأكيد الحجز'),
-            ),
+            CustomButton(text: selectedTime == null ? "Pick Time" : selectedTime!.format(context), onPressed: pickTime),
+            const SizedBox(height: 32),
+            CustomButton(text: "Book Appointment", onPressed: bookAppointment, isLoading: _loading),
           ],
         ),
       ),

@@ -146,6 +146,12 @@
       "languageVersion": "3.2"
     },
     {
+      "name": "lib",
+      "rootUri": "file:///C:/Users/Rashe/AppData/Local/Pub/Cache/hosted/pub.dev/lib-0.2.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.9"
+    },
+    {
       "name": "lints",
       "rootUri": "file:///C:/Users/Rashe/AppData/Local/Pub/Cache/hosted/pub.dev/lints-6.0.0",
       "packageUri": "lib/",

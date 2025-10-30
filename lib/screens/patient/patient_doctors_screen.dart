@@ -1,35 +1,59 @@
 import 'package:flutter/material.dart';
-import '../widgets/custom_app_bar.dart';
+import 'package:hospital_app/core/theme/app_colors.dart';
+import 'package:hospital_app/data/api/api_service.dart';
+import 'package:hospital_app/presentation/widgets/custom_app_bar.dart';
 
-class PatientDoctorsScreen extends StatelessWidget {
+class PatientDoctorsScreen extends StatefulWidget {
   const PatientDoctorsScreen({super.key});
+
+  @override
+  State<PatientDoctorsScreen> createState() => _PatientDoctorsScreenState();
+}
+
+class _PatientDoctorsScreenState extends State<PatientDoctorsScreen> {
+  List<dynamic>? doctors;
+
+  @override
+  void initState() {
+    super.initState();
+    loadDoctors();
+  }
+
+  Future<void> loadDoctors() async {
+    final data = await ApiService.getDoctors();
+    setState(() {
+      doctors = data;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const CustomAppBar(title: 'الأطباء'),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: 5,
-        itemBuilder: (context, index) {
-          return Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Color(0xFF1976D2),
-                child: Icon(Icons.person, color: Colors.white),
-              ),
-              title: const Text('د. أحمد علي'),
-              subtitle: const Text('أخصائي قلب'),
-              trailing: IconButton(
-                icon: const Icon(Icons.arrow_forward_ios, color: Color(0xFF1976D2)),
-                onPressed: () => Navigator.pushNamed(context, '/patient-book'),
-              ),
+      appBar: const CustomAppBar(title: "الأطباء"),
+      body: doctors == null
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: doctors!.length,
+              itemBuilder: (context, index) {
+                final d = doctors![index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: ListTile(
+                    title: Text(d['fullName']),
+                    subtitle: Text(d['specialty']),
+                    trailing: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                      ),
+                      onPressed: () {
+                        // مستقبلاً: فتح نافذة حجز موعد
+                      },
+                      child: const Text("احجز موعد"),
+                    ),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 }

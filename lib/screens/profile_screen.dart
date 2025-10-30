@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/api_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -6,27 +7,13 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My Profile')),
-      body: const Padding(
-        padding: EdgeInsets.all(24.0),
+      appBar: AppBar(title: const Text('Profile')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.blue,
-              child: Icon(Icons.person, size: 50, color: Colors.white),
-            ),
-            SizedBox(height: 20),
-            Text("Name: Patient One", style: TextStyle(fontSize: 18)),
-            SizedBox(height: 8),
-            Text("Email: patient1@demo.com", style: TextStyle(fontSize: 16)),
-            SizedBox(height: 20),
-            Divider(),
+          children: const [
+            Text('Profile Screen - Display user info here'),
             SizedBox(height: 10),
-            Text("Appointments:", style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
-            Text("• Dr. Rashed Emad - Cardiology - 10 Nov, 2:00 PM"),
           ],
         ),
       ),

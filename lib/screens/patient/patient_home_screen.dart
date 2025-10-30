@@ -1,63 +1,80 @@
 import 'package:flutter/material.dart';
-import '../widgets/custom_app_bar.dart';
-import '../widgets/custom_drawer.dart';
+import '../../services/api_service.dart';
+import '../../widgets/custom_button.dart';
+import '../../widgets/appointment_card.dart';
+import 'my_appointments_screen.dart';
+import 'book_appointment_screen.dart';
 
-class PatientHomeScreen extends StatelessWidget {
-  const PatientHomeScreen({super.key});
+class HomePatientScreen extends StatefulWidget {
+  const HomePatientScreen({super.key});
+
+  @override
+  State<HomePatientScreen> createState() => _HomePatientScreenState();
+}
+
+class _HomePatientScreenState extends State<HomePatientScreen> {
+  bool _loading = false;
+  List<dynamic> doctors = [];
+
+  @override
+  void initState() {
+    super.initState();
+    fetchDoctors();
+  }
+
+  Future<void> fetchDoctors() async {
+    setState(() => _loading = true);
+    try {
+      final data = await ApiService.getDoctors();
+      setState(() => doctors = data);
+    } catch (e) {
+      print("🔴 Error fetching doctors: $e");
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const CustomAppBar(title: 'الصفحة الرئيسية'),
-      drawer: const CustomDrawer(),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'مرحباً بك 👋',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1565C0)),
+      appBar: AppBar(title: const Text("Patient Home")),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  CustomButton(
+                    text: "My Appointments",
+                    onPressed: () {
+                      Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => const MyAppointmentsScreen()
+                      ));
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: doctors.length,
+                      itemBuilder: (context, index) {
+                        final doctor = doctors[index];
+                        return AppointmentCard(
+                          doctorName: doctor['fullName'] ?? "Doctor",
+                          date: "",
+                          time: "",
+                          status: "Available",
+                          onTap: () {
+                            Navigator.push(context, MaterialPageRoute(
+                              builder: (_) => BookAppointmentScreen(doctor: doctor)
+                            ));
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 10),
-            const Text('احجز مواعيدك الطبية بسهولة وسرعة.'),
-            const SizedBox(height: 30),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              children: [
-                _buildCard(context, Icons.calendar_today, 'مواعيدي', '/patient-appointments'),
-                _buildCard(context, Icons.add_circle_outline, 'حجز موعد', '/patient-book'),
-                _buildCard(context, Icons.medical_services, 'الأطباء', '/patient-doctors'),
-                _buildCard(context, Icons.notifications, 'الإشعارات', '/patient-notifications'),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCard(BuildContext context, IconData icon, String title, String route) {
-    return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, route),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: Colors.white,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 40, color: const Color(0xFF1976D2)),
-              const SizedBox(height: 10),
-              Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

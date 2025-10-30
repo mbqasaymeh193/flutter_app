@@ -1,26 +1,25 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/app_config.dart';
 
 class ApiService {
-  // 🌐 عنوان الـ API (تأكد من تغييره إذا كنت على سيرفر فعلي)
-  static const String baseUrl = "http://10.0.2.2:7000/api";
   static String? token;
 
-  // ✅ تخزين التوكن بعد تسجيل الدخول
+  // ✅ تخزين التوكن
   static Future<void> saveToken(String newToken) async {
     final prefs = await SharedPreferences.getInstance();
     token = newToken;
     await prefs.setString('jwt_token', newToken);
   }
 
-  // ✅ تحميل التوكن عند تشغيل التطبيق
+  // ✅ تحميل التوكن
   static Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
     token = prefs.getString('jwt_token');
   }
 
-  // ✅ تسجيل الخروج (حذف التوكن)
+  // ✅ حذف التوكن عند تسجيل الخروج
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     token = null;
@@ -30,32 +29,26 @@ class ApiService {
   // 🔐 تسجيل الدخول
   static Future<Map<String, dynamic>?> login(String email, String password) async {
     try {
-      final url = Uri.parse("$baseUrl/login");
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/login");
       final res = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"email": email, "password": password}),
       );
 
-      print("🟢 Login Response: ${res.statusCode} | ${res.body}");
-
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        if (data['token'] != null) {
-          await saveToken(data['token']);
-        }
+        if (data['token'] != null) await saveToken(data['token']);
         return data;
-      } else {
-        print("🔴 Login failed: ${res.body}");
-        return null;
       }
+      return null;
     } catch (e) {
-      print("⚠️ Login error: $e");
+      print("Login error: $e");
       return null;
     }
   }
 
-  // 🧾 إنشاء حساب جديد
+  // 🧾 تسجيل مستخدم جديد
   static Future<bool> register({
     required String fullName,
     required String email,
@@ -64,7 +57,7 @@ class ApiService {
     String specialty = "General",
   }) async {
     try {
-      final url = Uri.parse("$baseUrl/register");
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/register");
       final res = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
@@ -76,11 +69,9 @@ class ApiService {
           "specialty": specialty
         }),
       );
-
-      print("🟢 Register Response: ${res.statusCode} | ${res.body}");
       return res.statusCode == 200 || res.statusCode == 201;
     } catch (e) {
-      print("⚠️ Register error: $e");
+      print("Register error: $e");
       return false;
     }
   }
@@ -88,150 +79,153 @@ class ApiService {
   // 👩‍⚕️ جلب قائمة الأطباء
   static Future<List<dynamic>> getDoctors() async {
     try {
-      final url = Uri.parse("$baseUrl/doctors");
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/doctors");
       final res = await http.get(url);
-      print("🟢 getDoctors Response: ${res.statusCode}");
-      if (res.statusCode == 200) {
-        return jsonDecode(res.body);
-      } else {
-        print("🔴 Failed to load doctors: ${res.body}");
-        throw Exception("Failed to load doctors");
-      }
+      if (res.statusCode == 200) return jsonDecode(res.body);
+      return [];
     } catch (e) {
-      print("⚠️ getDoctors error: $e");
-      rethrow;
+      print("getDoctors error: $e");
+      return [];
     }
   }
 
-  // 📅 حجز موعد (للمريض)
+  // 📅 حجز موعد
   static Future<bool> bookAppointment({
     required int doctorId,
     required DateTime startsAt,
     required DateTime endsAt,
   }) async {
     await loadToken();
-    if (token == null) {
-      print("🔴 Booking failed: token is null");
+    if (token == null) return false;
+
+    try {
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/appointments/book");
+      final res = await http.post(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({
+          "doctorId": doctorId,
+          "startsAt": startsAt.toIso8601String(),
+          "endsAt": endsAt.toIso8601String(),
+        }),
+      );
+      return res.statusCode == 200 || res.statusCode == 201;
+    } catch (e) {
+      print("bookAppointment error: $e");
       return false;
     }
-
-    final url = Uri.parse("$baseUrl/appointments/book");
-    final res = await http.post(
-      url,
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer $token",
-      },
-      body: jsonEncode({
-        "doctorId": doctorId,
-        "startsAt": startsAt.toIso8601String(),
-        "endsAt": endsAt.toIso8601String(),
-      }),
-    );
-
-    print("📅 Booking Response: ${res.statusCode} | ${res.body}");
-    return res.statusCode == 200 || res.statusCode == 201;
   }
 
   // 📋 مواعيد المريض
-  static Future<List<dynamic>?> getMyAppointments() async {
+  static Future<List<dynamic>> getMyAppointments() async {
     await loadToken();
-    if (token == null) return null;
+    if (token == null) return [];
 
-    final url = Uri.parse("$baseUrl/appointments/mine");
-    final res = await http.get(url, headers: {"Authorization": "Bearer $token"});
-
-    print("🟢 getMyAppointments: ${res.statusCode}");
-    if (res.statusCode == 200) {
-      return jsonDecode(res.body);
+    try {
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/appointments/mine");
+      final res = await http.get(url, headers: {"Authorization": "Bearer $token"});
+      if (res.statusCode == 200) return jsonDecode(res.body);
+      return [];
+    } catch (e) {
+      print("getMyAppointments error: $e");
+      return [];
     }
-    return null;
   }
 
   // 🩺 مواعيد الطبيب
-  static Future<List<dynamic>?> getDoctorAppointments() async {
+  static Future<List<dynamic>> getDoctorAppointments() async {
     await loadToken();
-    if (token == null) return null;
+    if (token == null) return [];
 
-    final url = Uri.parse("$baseUrl/appointments/doctor");
-    final res = await http.get(url, headers: {"Authorization": "Bearer $token"});
-
-    print("🟢 getDoctorAppointments: ${res.statusCode}");
-    if (res.statusCode == 200) {
-      return jsonDecode(res.body);
+    try {
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/appointments/doctor");
+      final res = await http.get(url, headers: {"Authorization": "Bearer $token"});
+      if (res.statusCode == 200) return jsonDecode(res.body);
+      return [];
+    } catch (e) {
+      print("getDoctorAppointments error: $e");
+      return [];
     }
-    return null;
   }
 
-  // ✅ تحديث حالة الموعد (قبول / رفض)
+  // ✅ تحديث حالة الموعد
   static Future<bool> updateAppointmentStatus(int id, String status) async {
     await loadToken();
     if (token == null) return false;
 
-    final url = Uri.parse("$baseUrl/appointments/$id/status");
-    final res = await http.put(
-      url,
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer $token",
-      },
-      body: jsonEncode({"status": status}), // ✅ التصحيح المهم هنا
-    );
-
-    print("🟢 updateAppointmentStatus: ${res.statusCode}");
-    return res.statusCode == 200;
+    try {
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/appointments/$id/status");
+      final res = await http.put(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({"status": status}),
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      print("updateAppointmentStatus error: $e");
+      return false;
+    }
   }
 
   // 🔑 نسيت كلمة المرور
-  static Future<Map<String, dynamic>?> forgotPassword(String email) async {
+  static Future<bool> forgotPassword(String email) async {
     try {
-      final url = Uri.parse("$baseUrl/password/forgot");
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/password/forgot");
       final res = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"email": email}),
       );
-
-      print("🟢 forgotPassword: ${res.statusCode}");
-      if (res.statusCode == 200) {
-        return jsonDecode(res.body);
-      }
-      return null;
+      return res.statusCode == 200;
     } catch (e) {
-      print("⚠️ forgotPassword error: $e");
-      return null;
+      print("forgotPassword error: $e");
+      return false;
     }
   }
 
-  // 🔒 تغيير كلمة المرور بعد تسجيل الدخول
+  // 🔐 تغيير كلمة المرور بعد تسجيل الدخول
   static Future<bool> changePassword(String oldPass, String newPass) async {
     await loadToken();
     if (token == null) return false;
 
-    final url = Uri.parse("$baseUrl/password/change");
-    final res = await http.put(
-      url,
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer $token",
-      },
-      body: jsonEncode({"oldPassword": oldPass, "newPassword": newPass}),
-    );
-
-    print("🟢 changePassword: ${res.statusCode}");
-    return res.statusCode == 200;
+    try {
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/password/change");
+      final res = await http.put(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({"oldPassword": oldPass, "newPassword": newPass}),
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      print("changePassword error: $e");
+      return false;
+    }
   }
 
-  // ♻️ إعادة تعيين كلمة المرور (من شاشة نسيت كلمة المرور)
+  // 🧩 إعادة تعيين كلمة المرور (من شاشة نسيت كلمة المرور)
   static Future<bool> resetPassword(String email, String newPassword) async {
-    final url = Uri.parse("$baseUrl/password/reset");
-    final res = await http.post(
-      url,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({"email": email, "newPassword": newPassword}),
-    );
-
-    print("🟢 resetPassword: ${res.statusCode}");
-    return res.statusCode == 200;
+    try {
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/password/reset");
+      final res = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email, "newPassword": newPassword}),
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      print("resetPassword error: $e");
+      return false;
+    }
   }
+
+  static Future getAdminAppointments() async {}
 }
