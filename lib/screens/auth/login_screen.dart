@@ -17,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _hidePassword = true;
 
+  // ✅ تسجيل الدخول
   Future<void> _login() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -48,14 +49,11 @@ class _LoginScreenState extends State<LoginScreen> {
         const SnackBar(content: Text('تم تسجيل الدخول بنجاح ✅')),
       );
 
-      // ✅ التوجيه حسب الدور
+      // ✅ التوجيه حسب نوع الحساب
       if (role == 'doctor') {
         Navigator.pushReplacementNamed(context, AppRoutes.doctorDashboard);
       } else if (role == 'admin') {
-        // يمكنك لاحقًا إضافة شاشة إدارة هنا
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('سيتم إضافة واجهة الأدمن لاحقاً')),
-        );
+        Navigator.pushReplacementNamed(context, AppRoutes.adminDashboard);
       } else {
         Navigator.pushReplacementNamed(context, AppRoutes.patientHomeShell);
       }
@@ -77,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // شعار طبي حديث
+                // 🏥 شعار طبي أنيق
                 Icon(Icons.local_hospital_rounded,
                     size: 70, color: Colors.blue.shade700),
                 const SizedBox(height: 12),
@@ -91,7 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 30),
 
-                // Email
+                // 📧 البريد الإلكتروني
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -105,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Password
+                // 🔑 كلمة المرور
                 TextField(
                   controller: _passwordController,
                   obscureText: _hidePassword,
@@ -132,8 +130,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () => Navigator.pushNamed(
-                        context, AppRoutes.forgotPassword),
+                    onPressed: () =>
+                        Navigator.pushNamed(context, AppRoutes.forgotPassword),
                     child: const Text('هل نسيت كلمة المرور؟'),
                   ),
                 ),
@@ -161,14 +159,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 20),
 
-                // رابط التسجيل
+                // رابط إنشاء حساب جديد
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text('ليس لديك حساب؟'),
                     TextButton(
-                      onPressed: () => Navigator.pushNamed(
-                          context, AppRoutes.register),
+                      onPressed: () =>
+                          Navigator.pushNamed(context, AppRoutes.register),
                       child: const Text('إنشاء حساب جديد'),
                     ),
                   ],
