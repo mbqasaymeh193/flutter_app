@@ -90,13 +90,22 @@ class ApiService {
   }
 
   // 📅 حجز موعد
-  static Future<bool> bookAppointment(param0, {
-    required int doctorId,
+  static Future<bool> bookAppointment({
+    required dynamic doctorId,
     required DateTime startsAt,
     required DateTime endsAt,
   }) async {
     await loadToken();
     if (token == null) return false;
+
+    // Accept String or int for doctorId and coerce to int
+    int? id;
+    if (doctorId is int) {
+      id = doctorId;
+    } else if (doctorId is String) {
+      id = int.tryParse(doctorId);
+    }
+    if (id == null) return false;
 
     try {
       final url = Uri.parse("${AppConfig.apiBaseUrl}/appointments/book");
@@ -107,7 +116,7 @@ class ApiService {
           "Authorization": "Bearer $token",
         },
         body: jsonEncode({
-          "doctorId": doctorId,
+          "doctorId": id,
           "startsAt": startsAt.toIso8601String(),
           "endsAt": endsAt.toIso8601String(),
         }),
@@ -152,12 +161,20 @@ class ApiService {
   }
 
   // ✅ تحديث حالة الموعد
-  static Future<bool> updateAppointmentStatus(int id, String status) async {
+  static Future<bool> updateAppointmentStatus(dynamic id, String status) async {
     await loadToken();
     if (token == null) return false;
 
+    int? intId;
+    if (id is int) {
+      intId = id;
+    } else if (id is String) {
+      intId = int.tryParse(id);
+    }
+    if (intId == null) return false;
+
     try {
-      final url = Uri.parse("${AppConfig.apiBaseUrl}/appointments/$id/status");
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/appointments/$intId/status");
       final res = await http.put(
         url,
         headers: {
@@ -229,5 +246,25 @@ class ApiService {
 
   static Future getAdminAppointments() async {}
 
-  static Future cancelAppointment(id) async {}
+  static Future<bool> cancelAppointment(dynamic id) async {
+    await loadToken();
+    if (token == null) return false;
+
+    int? intId;
+    if (id is int) {
+      intId = id;
+    } else if (id is String) {
+      intId = int.tryParse(id);
+    }
+    if (intId == null) return false;
+
+    try {
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/appointments/$intId/cancel");
+      final res = await http.post(url, headers: {"Authorization": "Bearer $token"});
+      return res.statusCode == 200 || res.statusCode == 201;
+    } catch (e) {
+      print("cancelAppointment error: $e");
+      return false;
+    }
+  }
 }

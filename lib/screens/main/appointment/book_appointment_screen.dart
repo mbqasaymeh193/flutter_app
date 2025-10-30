@@ -3,41 +3,57 @@ import 'package:intl/intl.dart';
 import '../../../services/api_service.dart';
 
 class BookAppointmentScreen extends StatefulWidget {
-  const BookAppointmentScreen({super.key, required doctor});
+  final dynamic doctor;
+
+  const BookAppointmentScreen({super.key, required this.doctor});
 
   @override
   State<BookAppointmentScreen> createState() => _BookAppointmentScreenState();
 }
 
-class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
+class _BookAppointmentScreenState extends State<BookAppointmentScreen>
+    with SingleTickerProviderStateMixin {
   bool _loading = true;
   List<dynamic> _doctors = [];
-  dynamic _selectedDoctor;
+  int? _selectedDoctorId;
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   bool _booking = false;
+
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
     _fetchDoctors();
+    _selectedDoctorId = widget.doctor?['id'];
+
+    // ✨ إعداد حركة الدخول الناعمة
+    _fadeController =
+        AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+    _fadeAnimation =
+        CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchDoctors() async {
     setState(() => _loading = true);
     try {
       final res = await ApiService.getDoctors();
-      if (res != null && res is List) {
-        _doctors = res;
-      } else if (res != null && res is Map && res['data'] is List) {
-        _doctors = res['data'];
-      } else {
-        _doctors = [];
-      }
+      _doctors = res;
     } catch (e) {
       _doctors = [];
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        _fadeController.forward(); // 🔹 تشغيل الأنيميشن بعد التحميل
+      }
     }
   }
 
@@ -53,17 +69,24 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
   }
 
   Future<void> _pickTime() async {
-    final t = await showTimePicker(context: context, initialTime: TimeOfDay(hour: 9, minute: 0));
+    final t = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 9, minute: 0),
+    );
     if (t != null) setState(() => _selectedTime = t);
   }
 
   Future<void> _book() async {
-    if (_selectedDoctor == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a doctor')));
+    if (_selectedDoctorId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a doctor')),
+      );
       return;
     }
     if (_selectedDate == null || _selectedTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select date and time')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select date and time')),
+      );
       return;
     }
 
@@ -74,81 +97,175 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
       _selectedTime!.hour,
       _selectedTime!.minute,
     );
-
-    final iso = startsAt.toIso8601String();
+    final endsAt = startsAt.add(const Duration(minutes: 30));
 
     setState(() => _booking = true);
     try {
-      final ok = await ApiService.bookAppointment(_selectedDoctor['id'] ?? _selectedDoctor['doctorId'], iso);
+      final ok = await ApiService.bookAppointment(
+        doctorId: _selectedDoctorId!,
+        startsAt: startsAt,
+        endsAt: endsAt,
+      );
       if (ok == true) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Appointment booked successfully')));
-        Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Appointment booked successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // 🌊 حركة انتقال ناعمة عند العودة
+        Future.delayed(const Duration(milliseconds: 400), () {
+          Navigator.pop(context, true);
+        });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to book appointment')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to book appointment')),
+        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
     } finally {
       if (mounted) setState(() => _booking = false);
     }
   }
 
   String _formatSelected() {
-    if (_selectedDate == null || _selectedTime == null) return 'Select date & time';
-    final dt = DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day, _selectedTime!.hour, _selectedTime!.minute);
+    if (_selectedDate == null || _selectedTime == null) {
+      return 'Select date & time';
+    }
+    final dt = DateTime(
+      _selectedDate!.year,
+      _selectedDate!.month,
+      _selectedDate!.day,
+      _selectedTime!.hour,
+      _selectedTime!.minute,
+    );
     return DateFormat('EEE, MMM d • HH:mm').format(dt);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF4F7FB),
       appBar: AppBar(
         title: const Text('Book Appointment'),
         backgroundColor: const Color(0xFF1976D2),
+        elevation: 3,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  DropdownButtonFormField<dynamic>(
-                    initialValue: _selectedDoctor,
-                    decoration: const InputDecoration(labelText: 'Choose Doctor', border: OutlineInputBorder()),
-                    items: _doctors.map((d) {
-                      final name = d['fullName'] ?? d['name'] ?? 'Doctor';
-                      final spec = d['specialty'] ?? d['speciality'] ?? '';
-                      return DropdownMenuItem(value: d, child: Text('$name ${spec.isNotEmpty ? "— $spec" : ""}'));
-                    }).toList(),
-                    onChanged: (v) => setState(() => _selectedDoctor = v),
-                  ),
-                  const SizedBox(height: 16),
-                  ListTile(
-                    onTap: _pickDate,
-                    leading: const Icon(Icons.calendar_today),
-                    title: Text(_selectedDate == null ? 'Select Date' : DateFormat.yMMMMd().format(_selectedDate!)),
-                    trailing: const Icon(Icons.chevron_right),
-                  ),
-                  const SizedBox(height: 8),
-                  ListTile(
-                    onTap: _pickTime,
-                    leading: const Icon(Icons.access_time),
-                    title: Text(_selectedTime == null ? 'Select Time' : _selectedTime!.format(context)),
-                    trailing: const Icon(Icons.chevron_right),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(_formatSelected()),
-                  const SizedBox(height: 20),
-                  _booking
-                      ? const CircularProgressIndicator()
-                      : ElevatedButton(
-                          onPressed: _book,
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1976D2), minimumSize: const Size(double.infinity, 48)),
-                          child: const Text('Confirm Booking'),
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF1976D2)))
+          : FadeTransition(
+              opacity: _fadeAnimation,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Card(
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: DropdownButtonFormField<int>(
+                          value: _selectedDoctorId,
+                          decoration: const InputDecoration(
+                            labelText: 'Choose Doctor',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.medical_information),
+                          ),
+                          items: _doctors.map((d) {
+                            final id = d['id'];
+                            final name = d['fullName'] ?? d['name'] ?? 'Doctor';
+                            final spec = d['specialty'] ?? d['speciality'] ?? '';
+                            return DropdownMenuItem<int>(
+                              value: id,
+                              child: Text(
+                                '$name ${spec.isNotEmpty ? "— $spec" : ""}',
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (v) => setState(() => _selectedDoctorId = v),
                         ),
-                ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    _buildDateTile(),
+                    const SizedBox(height: 8),
+                    _buildTimeTile(),
+                    const SizedBox(height: 24),
+
+                    Text(
+                      _formatSelected(),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    _booking
+                        ? const CircularProgressIndicator(color: Color(0xFF1976D2))
+                        : ElevatedButton.icon(
+                            onPressed: _book,
+                            icon: const Icon(Icons.check_circle_outline),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1976D2),
+                              minimumSize: const Size(double.infinity, 50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 3,
+                            ),
+                            label: const Text(
+                              'Confirm Booking',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                  ],
+                ),
               ),
             ),
+    );
+  }
+
+  // 🗓️ عنصر اختيار التاريخ
+  Widget _buildDateTile() {
+    return ListTile(
+      tileColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      leading: const Icon(Icons.calendar_today, color: Color(0xFF1976D2)),
+      title: Text(
+        _selectedDate == null
+            ? 'Select Date'
+            : DateFormat.yMMMMd().format(_selectedDate!),
+        style: const TextStyle(fontSize: 16),
+      ),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: _pickDate,
+    );
+  }
+
+  // ⏰ عنصر اختيار الوقت
+  Widget _buildTimeTile() {
+    return ListTile(
+      tileColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      leading: const Icon(Icons.access_time, color: Color(0xFF1976D2)),
+      title: Text(
+        _selectedTime == null
+            ? 'Select Time'
+            : _selectedTime!.format(context),
+        style: const TextStyle(fontSize: 16),
+      ),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: _pickTime,
     );
   }
 }

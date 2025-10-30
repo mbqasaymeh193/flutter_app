@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'C:\Projects\medical-booking\medical-booking-frontend\flutter_app\lib\widgets\custom_app_bar.dart';
+import '../../widgets/custom_app_bar.dart';
 
 class AdminPatientsScreen extends StatelessWidget {
   const AdminPatientsScreen({super.key});

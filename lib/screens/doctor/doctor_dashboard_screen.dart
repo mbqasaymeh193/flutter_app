@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
-import '../doctor/doctor_appointments_screen.dart';
 
 class DoctorDashboardScreen extends StatefulWidget {
   const DoctorDashboardScreen({super.key});
@@ -21,7 +20,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   Future<void> _loadAppointments() async {
     final appointments = await ApiService.getDoctorAppointments();
     setState(() {
-      totalAppointments = appointments?.length ?? 0;
+      totalAppointments = appointments.length ?? 0;
     });
   }
 

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../services/api_service.dart';
-import '../patient/home_patient_screen.dart';
-import '../doctor/doctor_home_screen.dart';
-import '../admin/admin_home_screen.dart';
+import 'package:healthcare_flutter_app/services/api_service.dart';
+import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
+import 'package:healthcare_flutter_app/utils/nav.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _hidePassword = true;
 
   Future<void> _login() async {
     final email = _emailController.text.trim();
@@ -23,27 +23,45 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter both email and password')),
+        const SnackBar(content: Text('يرجى إدخال البريد وكلمة المرور')),
       );
       return;
     }
 
     setState(() => _isLoading = true);
+
     final result = await ApiService.login(email, password);
+
     setState(() => _isLoading = false);
 
     if (result != null && result['token'] != null) {
-      final role = result['role'] ?? 'Patient';
-      if (role == 'Doctor') {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DoctorHomeScreen()));
-      } else if (role == 'Admin') {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminHomeScreen()));
+      // حفظ بيانات المستخدم
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('token', result['token']);
+      await prefs.setString('role', result['role'] ?? '');
+      await prefs.setString('name', result['name'] ?? '');
+      ApiService.token = result['token'];
+
+      final role = (result['role'] ?? '').toString().toLowerCase();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تسجيل الدخول بنجاح ✅')),
+      );
+
+      // ✅ التوجيه حسب الدور
+      if (role == 'doctor') {
+        Navigator.pushReplacementNamed(context, AppRoutes.doctorDashboard);
+      } else if (role == 'admin') {
+        // يمكنك لاحقًا إضافة شاشة إدارة هنا
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('سيتم إضافة واجهة الأدمن لاحقاً')),
+        );
       } else {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePatientScreen()));
+        Navigator.pushReplacementNamed(context, AppRoutes.patientHomeShell);
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid email or password')),
+        const SnackBar(content: Text('بيانات تسجيل الدخول غير صحيحة ❌')),
       );
     }
   }
@@ -52,58 +70,109 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FC),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+      body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // شعار طبي حديث
+                Icon(Icons.local_hospital_rounded,
+                    size: 70, color: Colors.blue.shade700),
+                const SizedBox(height: 12),
                 const Text(
-                  'Welcome to Medical Booking',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1976D2)),
+                  'Medical Booking System',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1976D2),
+                  ),
                 ),
                 const SizedBox(height: 30),
+
+                // Email
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.email),
+                  decoration: InputDecoration(
+                    labelText: 'البريد الإلكتروني',
+                    prefixIcon: const Icon(Icons.email_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 15),
+                const SizedBox(height: 16),
+
+                // Password
                 TextField(
                   controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock),
+                  obscureText: _hidePassword,
+                  decoration: InputDecoration(
+                    labelText: 'كلمة المرور',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _hidePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                      ),
+                      onPressed: () =>
+                          setState(() => _hidePassword = !_hidePassword),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 10),
+
+                const SizedBox(height: 12),
+
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/forgot-password');
-                    },
-                    child: const Text('Forgot Password?'),
+                    onPressed: () => Navigator.pushNamed(
+                        context, AppRoutes.forgotPassword),
+                    child: const Text('هل نسيت كلمة المرور؟'),
                   ),
                 ),
-                const SizedBox(height: 10),
+
+                const SizedBox(height: 12),
+
+                // زر تسجيل الدخول
                 _isLoading
-                    ? const CircularProgressIndicator()
+                    ? const CircularProgressIndicator(color: Color(0xFF1976D2))
                     : ElevatedButton(
                         onPressed: _login,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF1976D2),
-                          minimumSize: const Size(double.infinity, 50),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        child: const Text('Login'),
+                        child: const Text(
+                          'تسجيل الدخول',
+                          style: TextStyle(fontSize: 16),
+                        ),
                       ),
+
+                const SizedBox(height: 20),
+
+                // رابط التسجيل
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('ليس لديك حساب؟'),
+                    TextButton(
+                      onPressed: () => Navigator.pushNamed(
+                          context, AppRoutes.register),
+                      child: const Text('إنشاء حساب جديد'),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),

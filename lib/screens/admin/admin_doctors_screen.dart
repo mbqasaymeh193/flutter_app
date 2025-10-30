@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:hospital_app/data/api/api_service.dart';
-import 'package:hospital_app/presentation/widgets/custom_app_bar.dart';
+import '../../services/api_service.dart';
+import '../../widgets/custom_app_bar.dart';
 
 class AdminDoctorsScreen extends StatefulWidget {
   const AdminDoctorsScreen({super.key});

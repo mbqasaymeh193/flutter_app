@@ -21,7 +21,7 @@ class _ManageAppointmentsScreenState extends State<ManageAppointmentsScreen> {
   Future<void> loadAppointments() async {
     final data = await ApiService.getDoctorAppointments(); // أو دالة admin
     setState(() {
-      appointments = data ?? [];
+      appointments = data;
       loading = false;
     });
   }

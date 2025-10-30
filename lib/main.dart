@@ -12,7 +12,7 @@ class HospitalApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'نظام المستشفى',
+      title: 'Medical Booking App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primaryColor: AppColors.primary,
@@ -25,7 +25,7 @@ class HospitalApp extends StatelessWidget {
           centerTitle: true,
         ),
       ),
-      initialRoute: AppRoutes.doctorDashboard, // يمكنك تغييره مثل: AppRoutes.patientDashboard
+      initialRoute: '/login_screen', // يمكنك تغييره مثل: AppRoutes.patientDashboard
       onGenerateRoute: AppRoutes.generateRoute,
     );
   }

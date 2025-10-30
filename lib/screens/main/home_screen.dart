@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../profile_screen.dart';
 import '../settings_screen.dart';
-import 'appointment/appointments_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,7 +13,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = const [
-    AppointmentsScreen(),
     ProfileScreen(),
     SettingsScreen(),
   ];

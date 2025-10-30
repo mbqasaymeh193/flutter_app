@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../services/api_service.dart';
+import 'package:healthcare_flutter_app/services/api_service.dart';
+import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -12,10 +13,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
   bool _isLoading = false;
 
-  Future<void> _sendReset() async {
+  Future<void> _submit() async {
     final email = _emailController.text.trim();
+
     if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your email')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى إدخال البريد الإلكتروني')),
+      );
       return;
     }
 
@@ -24,26 +28,79 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() => _isLoading = false);
 
     if (result != null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password reset link sent')));
-      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تم إرسال كود إلى بريدك الإلكتروني (أو عرضه في الكونسول أثناء التطوير)',
+          ),
+        ),
+      );
+      Navigator.pushNamed(context, AppRoutes.resetPassword);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to send reset link')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('فشل إرسال طلب الاستعادة ❌')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Forgot Password')),
+      backgroundColor: const Color(0xFFF7F9FC),
+      appBar: AppBar(
+        title: const Text('نسيت كلمة المرور'),
+        backgroundColor: const Color(0xFF1976D2),
+      ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(24),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(controller: _emailController, decoration: const InputDecoration(labelText: 'Email')),
-            const SizedBox(height: 20),
+            const Text(
+              'أدخل بريدك الإلكتروني لإرسال رمز الاستعادة',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'البريد الإلكتروني',
+                prefixIcon: const Icon(Icons.email_outlined),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
             _isLoading
-                ? const CircularProgressIndicator()
-                : ElevatedButton(onPressed: _sendReset, child: const Text('Send Reset Link')),
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF1976D2)))
+                : ElevatedButton(
+                    onPressed: _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1976D2),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'إرسال الرمز',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+            const SizedBox(height: 20),
+            Align(
+              alignment: Alignment.center,
+              child: TextButton(
+                onPressed: () =>
+                    Navigator.pushReplacementNamed(context, AppRoutes.login),
+                child: const Text('العودة إلى تسجيل الدخول'),
+              ),
+            ),
           ],
         ),
       ),

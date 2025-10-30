@@ -20,7 +20,7 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
   Future<void> _loadAppointments() async {
     final appointments = await ApiService.getMyAppointments();
     setState(() {
-      totalAppointments = appointments?.length ?? 0;
+      totalAppointments = appointments.length ?? 0;
     });
   }
 
