@@ -25,7 +25,7 @@ class AdminHomeScreen extends StatelessWidget {
                   context,
                   MaterialPageRoute(builder: (_) => const AdminAppointmentsScreen()),
                 );
-              },
+              }, color: null,
             ),
           ],
         ),

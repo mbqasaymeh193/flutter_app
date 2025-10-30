@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:hospital_app/core/theme/app_colors.dart';
-import 'package:hospital_app/data/api/api_service.dart';
-import 'package:hospital_app/presentation/widgets/custom_app_bar.dart';
+import '../../core/theme/app_colors.dart';
+import '../../services/api_service.dart';
+import '../../widgets/custom_app_bar.dart';
 
 class PatientDoctorsScreen extends StatefulWidget {
   const PatientDoctorsScreen({super.key});

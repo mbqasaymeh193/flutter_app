@@ -48,7 +48,7 @@ class _ConfirmAppointmentScreenState extends State<ConfirmAppointmentScreen> {
                       Expanded(
                         child: CustomButton(
                           text: "Accept",
-                          onPressed: () => updateStatus("Accepted"),
+                          onPressed: () => updateStatus("Accepted"), color: null,
                         ),
                       ),
                       const SizedBox(width: 16),

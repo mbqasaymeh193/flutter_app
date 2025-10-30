@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import '../../../services/api_service.dart';
 
 class BookAppointmentScreen extends StatefulWidget {
-  const BookAppointmentScreen({super.key});
+  const BookAppointmentScreen({super.key, required doctor});
 
   @override
   State<BookAppointmentScreen> createState() => _BookAppointmentScreenState();

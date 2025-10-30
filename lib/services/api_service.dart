@@ -90,7 +90,7 @@ class ApiService {
   }
 
   // 📅 حجز موعد
-  static Future<bool> bookAppointment({
+  static Future<bool> bookAppointment(param0, {
     required int doctorId,
     required DateTime startsAt,
     required DateTime endsAt,
@@ -228,4 +228,6 @@ class ApiService {
   }
 
   static Future getAdminAppointments() async {}
+
+  static Future cancelAppointment(id) async {}
 }

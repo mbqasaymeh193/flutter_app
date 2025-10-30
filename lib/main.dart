@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/core/routes/app_routes.dart';
-import 'package:flutter_app/core/theme/app_colors.dart';
+import 'core/routes/app_routes.dart';
+import 'core/theme/app_colors.dart';
 
 void main() {
   runApp(const HospitalApp());

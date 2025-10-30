@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/appointment_card.dart';
+import '../main/appointment/book_appointment_screen.dart';
 import 'my_appointments_screen.dart';
-import 'book_appointment_screen.dart';
 
 class HomePatientScreen extends StatefulWidget {
   const HomePatientScreen({super.key});

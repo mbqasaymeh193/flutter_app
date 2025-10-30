@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../services/api_service.dart';
-import 'appointment_detail_screen.dart';
+import 'appointment_details_screen.dart';
 import 'book_appointment_screen.dart';
 
 class AppointmentsScreen extends StatefulWidget {
@@ -100,7 +100,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                       Center(
                         child: TextButton(
                           onPressed: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const BookAppointmentScreen())).then((_) => _fetchAppointments());
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const BookAppointmentScreen(doctor: null,))).then((_) => _fetchAppointments());
                           },
                           child: const Text('Book your first appointment'),
                         ),
@@ -117,7 +117,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
         backgroundColor: const Color(0xFF1976D2),
         child: const Icon(Icons.add),
         onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const BookAppointmentScreen())).then((_) => _fetchAppointments());
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const BookAppointmentScreen(doctor: null,))).then((_) => _fetchAppointments());
         },
       ),
     );
