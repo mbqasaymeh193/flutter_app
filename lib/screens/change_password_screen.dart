@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:healthcare_flutter_app/services/api_service.dart';
-import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});

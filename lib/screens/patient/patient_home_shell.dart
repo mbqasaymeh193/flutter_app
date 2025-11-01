@@ -3,8 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:healthcare_flutter_app/services/api_service.dart';
 import 'package:healthcare_flutter_app/utils/nav.dart';
 import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
-import 'patient_appointments_screen.dart';
-import 'patient_profile_screen.dart';
 import '../main/appointment/book_appointment_screen.dart';
 
 class PatientHomeShell extends StatefulWidget {

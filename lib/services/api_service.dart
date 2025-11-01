@@ -48,33 +48,44 @@ class ApiService {
     }
   }
 
-  // 🧾 تسجيل مستخدم جديد
-  static Future<bool> register({
-    required String fullName,
-    required String email,
-    required String password,
-    String role = "Patient",
-    String specialty = "General",
-  }) async {
-    try {
-      final url = Uri.parse("${AppConfig.apiBaseUrl}/register");
-      final res = await http.post(
-        url,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "fullName": fullName,
-          "email": email,
-          "password": password,
-          "role": role,
-          "specialty": specialty
-        }),
-      );
-      return res.statusCode == 200 || res.statusCode == 201;
-    } catch (e) {
-      print("Register error: $e");
-      return false;
+  // 🧾 إنشاء حساب جديد (يدعم الدور والتخصص)
+static Future<bool> register({
+  required String fullName,
+  required String email,
+  required String password,
+  String role = "Patient",
+  String specialty = "General",
+}) async {
+  try {
+    final url = Uri.parse("${AppConfig.apiBaseUrl}/register");
+    final body = {
+      "fullName": fullName,
+      "email": email,
+      "password": password,
+      "role": role,
+    };
+
+    // 👩‍⚕️ إذا كان الدور Doctor أضف التخصص
+    if (role.toLowerCase() == "doctor") {
+      body["specialty"] = specialty;
     }
+
+    final res = await http.post(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode(body),
+    );
+
+    print("📦 Register status: ${res.statusCode}");
+    print("📦 Register body: ${res.body}");
+
+    return res.statusCode == 200 || res.statusCode == 201;
+  } catch (e) {
+    print("⚠️ Register error: $e");
+    return false;
   }
+}
+
 
   // 👩‍⚕️ جلب قائمة الأطباء
   static Future<List<dynamic>> getDoctors() async {
@@ -98,7 +109,6 @@ class ApiService {
     await loadToken();
     if (token == null) return false;
 
-    // Accept String or int for doctorId and coerce to int
     int? id;
     if (doctorId is int) {
       id = doctorId;
@@ -244,8 +254,60 @@ class ApiService {
     }
   }
 
-  static Future getAdminAppointments() async {}
+  // 🧾 مواعيد الأدمن (جميع المواعيد)
+  static Future<List<dynamic>> getAdminAppointments() async {
+    await loadToken();
+    if (token == null) return [];
 
+    try {
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/admin/appointments");
+      final res = await http.get(
+        url,
+        headers: {"Authorization": "Bearer $token"},
+      );
+
+      print("🛡️ Admin appointments status: ${res.statusCode}");
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data is List) return data;
+        if (data is Map && data['items'] is List) return List<dynamic>.from(data['items']);
+        return [];
+      }
+      return [];
+    } catch (e) {
+      print("getAdminAppointments error: $e");
+      return [];
+    }
+  }
+
+  // 👥 جلب جميع المستخدمين (خاصة بالأدمن)
+  static Future<List<dynamic>> getAllUsers() async {
+    await loadToken();
+    if (token == null) return [];
+
+    try {
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/admin/users");
+      final res = await http.get(
+        url,
+        headers: {"Authorization": "Bearer $token"},
+      );
+
+      print("🧾 getAllUsers status: ${res.statusCode}");
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data is List) return data;
+        if (data is Map && data['items'] is List) return List<dynamic>.from(data['items']);
+      }
+      return [];
+    } catch (e) {
+      print("getAllUsers error: $e");
+      return [];
+    }
+  }
+
+  // ❌ إلغاء موعد
   static Future<bool> cancelAppointment(dynamic id) async {
     await loadToken();
     if (token == null) return false;

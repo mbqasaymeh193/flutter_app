@@ -171,7 +171,7 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen>
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: DropdownButtonFormField<int>(
-                          value: _selectedDoctorId,
+                          initialValue: _selectedDoctorId,
                           decoration: const InputDecoration(
                             labelText: 'Choose Doctor',
                             border: OutlineInputBorder(),

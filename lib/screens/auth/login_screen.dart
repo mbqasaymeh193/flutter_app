@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:healthcare_flutter_app/services/api_service.dart';
 import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
-import 'package:healthcare_flutter_app/utils/nav.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

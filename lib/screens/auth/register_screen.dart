@@ -156,7 +156,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
             // الدور
             DropdownButtonFormField<String>(
-              value: _selectedRole,
+              initialValue: _selectedRole,
               decoration: InputDecoration(
                 labelText: 'الدور',
                 border: OutlineInputBorder(
@@ -175,7 +175,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             // التخصص (للدكتور فقط)
             if (_selectedRole == 'Doctor')
               DropdownButtonFormField<String>(
-                value: _selectedSpecialty,
+                initialValue: _selectedSpecialty,
                 decoration: InputDecoration(
                   labelText: 'التخصص الطبي',
                   border: OutlineInputBorder(

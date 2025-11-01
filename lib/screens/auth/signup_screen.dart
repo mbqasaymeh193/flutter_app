@@ -30,7 +30,6 @@ class _SignupScreenState extends State<SignupScreen> {
       fullName: fullName,
       email: email,
       password: password,
-      role: 'Patient',
     );
     setState(() => _isLoading = false);
 

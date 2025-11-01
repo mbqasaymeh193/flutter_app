@@ -27,21 +27,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final result = await ApiService.forgotPassword(email);
     setState(() => _isLoading = false);
 
-    if (result != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'تم إرسال كود إلى بريدك الإلكتروني (أو عرضه في الكونسول أثناء التطوير)',
-          ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'تم إرسال كود إلى بريدك الإلكتروني (أو عرضه في الكونسول أثناء التطوير)',
         ),
-      );
-      Navigator.pushNamed(context, AppRoutes.resetPassword);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('فشل إرسال طلب الاستعادة ❌')),
-      );
+      ),
+    );
+    Navigator.pushNamed(context, AppRoutes.resetPassword);
     }
-  }
 
   @override
   Widget build(BuildContext context) {

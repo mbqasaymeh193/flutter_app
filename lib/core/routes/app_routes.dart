@@ -22,6 +22,8 @@ import 'package:healthcare_flutter_app/screens/auth/reset_password_screen.dart';
 import 'package:healthcare_flutter_app/screens/change_password_screen.dart';
 import 'package:healthcare_flutter_app/screens/admin/admin_home_shell.dart';
 
+import '../../screens/auth/register_success_screen.dart';
+
 class AppRoutes {
   // -------- Auth --------
   static const String login = '/login_screen';
@@ -44,6 +46,9 @@ class AppRoutes {
   static const String doctorNotifications = '/doctorNotifications';
   static const String doctorSettings = '/doctorSettings';
   static const String adminDashboard = '/adminDashboard'; // ✅ جديد
+  // داخل class AppRoutes:
+  static const String registerSuccess = '/registerSuccess';
+
   // ====== Router ======
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -84,7 +89,17 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const DoctorSettingsScreen());
       case adminDashboard:
        return MaterialPageRoute(builder: (_) => const AdminHomeShell());  
-
+      case registerSuccess:
+    final args = settings.arguments as Map<String, dynamic>?;
+      return MaterialPageRoute(
+      builder: (_) => RegisterSuccessScreen(
+        name: args?['name'],
+        role: args?['role'],
+        autoLoggedIn: args?['autoLoggedIn'] ?? true,
+    ),
+  );
+ 
+      
       // ----- 404 -----
       default:
         return MaterialPageRoute(
