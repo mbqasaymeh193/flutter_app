@@ -14,15 +14,16 @@ import 'package:healthcare_flutter_app/screens/patient/patient_appointments_scre
 import 'package:healthcare_flutter_app/screens/patient/patient_profile_screen.dart';
 import 'package:healthcare_flutter_app/screens/patient/patient_home_shell.dart';
 
+// ===== Admin Screens =====
+import 'package:healthcare_flutter_app/screens/admin/admin_home_shell.dart';
+
 // ===== Auth Screens =====
 import 'package:healthcare_flutter_app/screens/auth/login_screen.dart';
 import 'package:healthcare_flutter_app/screens/auth/register_screen.dart';
 import 'package:healthcare_flutter_app/screens/auth/forgot_password_screen.dart';
 import 'package:healthcare_flutter_app/screens/auth/reset_password_screen.dart';
+import 'package:healthcare_flutter_app/screens/auth/register_success_screen.dart';
 import 'package:healthcare_flutter_app/screens/change_password_screen.dart';
-import 'package:healthcare_flutter_app/screens/admin/admin_home_shell.dart';
-
-import '../../screens/auth/register_success_screen.dart';
 
 class AppRoutes {
   // -------- Auth --------
@@ -30,13 +31,14 @@ class AppRoutes {
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
   static const String resetPassword = '/reset-password';
-  static const String changePassword = '/changePassword'; // ✅ (الجديد)
+  static const String changePassword = '/changePassword';
+  static const String registerSuccess = '/registerSuccess';
 
   // -------- Patient --------
+  static const String patientHomeShell = '/patientHomeShell';
   static const String patientDashboard = '/patientDashboard';
   static const String patientAppointments = '/patientAppointments';
   static const String patientProfile = '/patientProfile';
-  static const String patientHomeShell = '/patientHomeShell'; // (اختياري للحاوية الحديثة)
 
   // -------- Doctor --------
   static const String doctorDashboard = '/doctorDashboard';
@@ -45,14 +47,14 @@ class AppRoutes {
   static const String doctorProfile = '/doctorProfile';
   static const String doctorNotifications = '/doctorNotifications';
   static const String doctorSettings = '/doctorSettings';
-  static const String adminDashboard = '/adminDashboard'; // ✅ جديد
-  // داخل class AppRoutes:
-  static const String registerSuccess = '/registerSuccess';
+
+  // -------- Admin --------
+  static const String adminDashboard = '/adminDashboard';
 
   // ====== Router ======
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
-      // ----- Auth -----
+      // ===== Auth =====
       case login:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
       case register:
@@ -61,10 +63,19 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const ForgotPasswordScreen());
       case resetPassword:
         return MaterialPageRoute(builder: (_) => const ResetPasswordScreen());
-      case changePassword: // ✅ مضافة
+      case changePassword:
         return MaterialPageRoute(builder: (_) => const ChangePasswordScreen());
+      case registerSuccess:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (_) => RegisterSuccessScreen(
+            name: args?['name'],
+            role: args?['role'],
+            autoLoggedIn: args?['autoLoggedIn'] ?? true,
+          ),
+        );
 
-      // ----- Patient -----
+      // ===== Patient =====
       case patientHomeShell:
         return MaterialPageRoute(builder: (_) => const PatientHomeShell());
       case patientDashboard:
@@ -74,7 +85,7 @@ class AppRoutes {
       case patientProfile:
         return MaterialPageRoute(builder: (_) => const PatientProfileScreen());
 
-      // ----- Doctor -----
+      // ===== Doctor =====
       case doctorDashboard:
         return MaterialPageRoute(builder: (_) => const DoctorDashboardScreen());
       case doctorAppointments:
@@ -87,27 +98,24 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const DoctorNotificationsScreen());
       case doctorSettings:
         return MaterialPageRoute(builder: (_) => const DoctorSettingsScreen());
+
+      // ===== Admin =====
       case adminDashboard:
-       return MaterialPageRoute(builder: (_) => const AdminHomeShell());  
-      case registerSuccess:
-    final args = settings.arguments as Map<String, dynamic>?;
-      return MaterialPageRoute(
-      builder: (_) => RegisterSuccessScreen(
-        name: args?['name'],
-        role: args?['role'],
-        autoLoggedIn: args?['autoLoggedIn'] ?? true,
-    ),
-  );
- 
-      
-      // ----- 404 -----
+        return MaterialPageRoute(builder: (_) => const AdminHomeShell());
+
+      // ===== Default (404) =====
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(
-            appBar: AppBar(title: const Text('الصفحة غير موجودة')),
+            appBar: AppBar(
+              title: const Text('الصفحة غير موجودة ❌'),
+              backgroundColor: const Color(0xFF1976D2),
+            ),
             body: Center(
-              child: Text('Route "${settings.name}" غير معرّف ❌',
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              child: Text(
+                'المسار "${settings.name}" غير معرّف',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
         );

@@ -153,22 +153,31 @@ static Future<bool> register({
       return [];
     }
   }
+  
+  // 🩺 جلب مواعيد الطبيب
+static Future<List<dynamic>?> getDoctorAppointments() async {
+  try {
+    final url = Uri.parse("${AppConfig.apiBaseUrl}/doctor/appointments");
+    final res = await http.get(url, headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer $token",
+    });
 
-  // 🩺 مواعيد الطبيب
-  static Future<List<dynamic>> getDoctorAppointments() async {
-    await loadToken();
-    if (token == null) return [];
+    print("📦 Doctor appointments status: ${res.statusCode}");
+    print("📦 Doctor appointments body: ${res.body}");
 
-    try {
-      final url = Uri.parse("${AppConfig.apiBaseUrl}/appointments/doctor");
-      final res = await http.get(url, headers: {"Authorization": "Bearer $token"});
-      if (res.statusCode == 200) return jsonDecode(res.body);
-      return [];
-    } catch (e) {
-      print("getDoctorAppointments error: $e");
-      return [];
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      return data is List ? data : data['appointments'];
+    } else {
+      return null;
     }
+  } catch (e) {
+    print("⚠️ getDoctorAppointments error: $e");
+    return null;
   }
+}
+
 
   // ✅ تحديث حالة الموعد
   static Future<bool> updateAppointmentStatus(dynamic id, String status) async {
