@@ -33,7 +33,7 @@
     },
     {
       "name": "crypto",
-      "rootUri": "file:///C:/Users/Rashe/AppData/Local/Pub/Cache/hosted/pub.dev/crypto-3.0.6",
+      "rootUri": "file:///C:/Users/Rashe/AppData/Local/Pub/Cache/hosted/pub.dev/crypto-3.0.7",
       "packageUri": "lib/",
       "languageVersion": "3.4"
     },
@@ -111,7 +111,7 @@
     },
     {
       "name": "http",
-      "rootUri": "file:///C:/Users/Rashe/AppData/Local/Pub/Cache/hosted/pub.dev/http-1.5.0",
+      "rootUri": "file:///C:/Users/Rashe/AppData/Local/Pub/Cache/hosted/pub.dev/http-1.6.0",
       "packageUri": "lib/",
       "languageVersion": "3.4"
     },

@@ -1,32 +1,20 @@
 import 'package:flutter/material.dart';
 
-// ===== Doctor Screens =====
-import 'package:healthcare_flutter_app/screens/doctor/doctor_dashboard_screen.dart';
-import 'package:healthcare_flutter_app/screens/doctor/doctor_appointments_screen.dart';
-import 'package:healthcare_flutter_app/screens/doctor/doctor_patients_screen.dart';
-import 'package:healthcare_flutter_app/screens/doctor/doctor_profile_screen.dart';
-import 'package:healthcare_flutter_app/screens/doctor/doctor_notifications_screen.dart';
-import 'package:healthcare_flutter_app/screens/doctor/doctor_settings_screen.dart';
+// Doctor
+import 'package:healthcare_flutter_app/screens/doctor/doctor_home_shell.dart';
 
-// ===== Patient Screens =====
-import 'package:healthcare_flutter_app/screens/patient/patient_dashboard_screen.dart';
-import 'package:healthcare_flutter_app/screens/patient/patient_appointments_screen.dart';
-import 'package:healthcare_flutter_app/screens/patient/patient_profile_screen.dart';
-import 'package:healthcare_flutter_app/screens/patient/patient_home_shell.dart';
-
-// ===== Admin Screens =====
-import 'package:healthcare_flutter_app/screens/admin/admin_home_shell.dart';
-
-// ===== Auth Screens =====
+// باقي الشاشات/المسارات لديك...
 import 'package:healthcare_flutter_app/screens/auth/login_screen.dart';
 import 'package:healthcare_flutter_app/screens/auth/register_screen.dart';
 import 'package:healthcare_flutter_app/screens/auth/forgot_password_screen.dart';
 import 'package:healthcare_flutter_app/screens/auth/reset_password_screen.dart';
-import 'package:healthcare_flutter_app/screens/auth/register_success_screen.dart';
 import 'package:healthcare_flutter_app/screens/change_password_screen.dart';
+import 'package:healthcare_flutter_app/screens/patient/patient_home_shell.dart';
+import 'package:healthcare_flutter_app/screens/admin/admin_home_shell.dart';
+import '../../screens/auth/register_success_screen.dart';
 
 class AppRoutes {
-  // -------- Auth --------
+  // Auth
   static const String login = '/login_screen';
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
@@ -34,27 +22,23 @@ class AppRoutes {
   static const String changePassword = '/changePassword';
   static const String registerSuccess = '/registerSuccess';
 
-  // -------- Patient --------
+  // Patient
   static const String patientHomeShell = '/patientHomeShell';
-  static const String patientDashboard = '/patientDashboard';
-  static const String patientAppointments = '/patientAppointments';
-  static const String patientProfile = '/patientProfile';
 
-  // -------- Doctor --------
+  // Doctor (كلها تفتح نفس الـShell مع تبويب مختلف)
+  static const String doctorHomeShell = '/doctorHomeShell';
   static const String doctorDashboard = '/doctorDashboard';
   static const String doctorAppointments = '/doctorAppointments';
   static const String doctorPatients = '/doctorPatients';
   static const String doctorProfile = '/doctorProfile';
-  static const String doctorNotifications = '/doctorNotifications';
   static const String doctorSettings = '/doctorSettings';
 
-  // -------- Admin --------
+  // Admin
   static const String adminDashboard = '/adminDashboard';
 
-  // ====== Router ======
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
-      // ===== Auth =====
+      // Auth
       case login:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
       case register:
@@ -75,47 +59,43 @@ class AppRoutes {
           ),
         );
 
-      // ===== Patient =====
+      // Patient
       case patientHomeShell:
         return MaterialPageRoute(builder: (_) => const PatientHomeShell());
-      case patientDashboard:
-        return MaterialPageRoute(builder: (_) => const PatientDashboardScreen());
-      case patientAppointments:
-        return MaterialPageRoute(builder: (_) => const PatientAppointmentsScreen());
-      case patientProfile:
-        return MaterialPageRoute(builder: (_) => const PatientProfileScreen());
 
-      // ===== Doctor =====
+      // Doctor routes → نفس الـShell مع تبويب مناسب
+      case doctorHomeShell:
+        final tab = (settings.arguments as int?) ?? 0;
+        return MaterialPageRoute(
+            builder: (_) => DoctorHomeShell(initialTab: tab));
       case doctorDashboard:
-        return MaterialPageRoute(builder: (_) => const DoctorDashboardScreen());
+        return MaterialPageRoute(
+            builder: (_) => const DoctorHomeShell(initialTab: 0));
       case doctorAppointments:
-        return MaterialPageRoute(builder: (_) => const DoctorAppointmentsScreen());
+        return MaterialPageRoute(
+            builder: (_) => const DoctorHomeShell(initialTab: 1));
       case doctorPatients:
-        return MaterialPageRoute(builder: (_) => const DoctorPatientsScreen());
+        return MaterialPageRoute(
+            builder: (_) => const DoctorHomeShell(initialTab: 2));
       case doctorProfile:
-        return MaterialPageRoute(builder: (_) => const DoctorProfileScreen());
-      case doctorNotifications:
-        return MaterialPageRoute(builder: (_) => const DoctorNotificationsScreen());
+        return MaterialPageRoute(
+            builder: (_) => const DoctorHomeShell(initialTab: 3));
       case doctorSettings:
-        return MaterialPageRoute(builder: (_) => const DoctorSettingsScreen());
+        return MaterialPageRoute(
+            builder: (_) => const DoctorHomeShell(initialTab: 4));
 
-      // ===== Admin =====
+      // Admin
       case adminDashboard:
         return MaterialPageRoute(builder: (_) => const AdminHomeShell());
 
-      // ===== Default (404) =====
+      // 404
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(
-            appBar: AppBar(
-              title: const Text('الصفحة غير موجودة ❌'),
-              backgroundColor: const Color(0xFF1976D2),
-            ),
+            appBar: AppBar(title: const Text('الصفحة غير موجودة')),
             body: Center(
-              child: Text(
-                'المسار "${settings.name}" غير معرّف',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
+              child: Text('Route "${settings.name}" غير معرّف ❌',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
             ),
           ),
         );

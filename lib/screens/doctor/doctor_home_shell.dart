@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:healthcare_flutter_app/services/api_service.dart';
 import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
-import 'doctor_patient_details_screen.dart'; // ✅ شاشة تفاصيل المريض
+import 'doctor_patient_details_screen.dart';
 
 class DoctorHomeShell extends StatefulWidget {
-  const DoctorHomeShell({super.key});
+  final int initialTab; // ✅ تبويب البداية (0..4)
+
+  const DoctorHomeShell({super.key, this.initialTab = 0});
 
   @override
   State<DoctorHomeShell> createState() => _DoctorHomeShellState();
@@ -13,7 +15,7 @@ class DoctorHomeShell extends StatefulWidget {
 
 class _DoctorHomeShellState extends State<DoctorHomeShell>
     with TickerProviderStateMixin {
-  int _currentIndex = 0;
+  late int _currentIndex;
   late final PageController _pageController;
 
   bool _loadingAppointments = true;
@@ -22,7 +24,8 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(keepPage: true);
+    _currentIndex = widget.initialTab.clamp(0, 4);
+    _pageController = PageController(keepPage: true, initialPage: _currentIndex);
     _loadAppointments();
   }
 
@@ -31,7 +34,7 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
     setState(() => _loadingAppointments = true);
     try {
       final data = await ApiService.getDoctorAppointments();
-      setState(() => _appointments = data ?? []);
+      setState(() => _appointments = (data ?? []));
     } catch (_) {
       setState(() => _appointments = []);
     } finally {
@@ -48,22 +51,28 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
     );
   }
 
+  String _titleForIndex(int i) {
+    switch (i) {
+      case 0:
+        return 'لوحة الطبيب';
+      case 1:
+        return 'مواعيدي';
+      case 2:
+        return 'مرضاي';
+      case 3:
+        return 'الملف الشخصي';
+      case 4:
+      default:
+        return 'الإعدادات';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FB),
       appBar: AppBar(
-        title: Text(
-          _currentIndex == 0
-              ? 'لوحة الطبيب'
-              : _currentIndex == 1
-                  ? 'مواعيدي'
-                  : _currentIndex == 2
-                      ? 'مرضاي'
-                      : _currentIndex == 3
-                          ? 'الملف الشخصي'
-                          : 'الإعدادات',
-        ),
+        title: Text(_titleForIndex(_currentIndex)),
         backgroundColor: const Color(0xFF1976D2),
         elevation: 2,
         actions: _currentIndex == 1
@@ -151,7 +160,7 @@ class _DashboardTab extends StatelessWidget {
   }
 }
 
-/// 🔹 تبويب المواعيد للطبيب (مع عداد أعلى الصفحة)
+/// 🔹 تبويب المواعيد للطبيب
 class _AppointmentsTab extends StatelessWidget {
   final bool loading;
   final List<dynamic> appointments;
@@ -184,53 +193,14 @@ class _AppointmentsTab extends StatelessWidget {
     if (appointments.isEmpty) {
       return const Center(child: Text('لا توجد مواعيد حالياً'));
     }
-
     return RefreshIndicator(
       color: const Color(0xFF1976D2),
       onRefresh: onRefresh,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: appointments.length + 1, // ✅ +1 لعرض العداد في البداية
+        itemCount: appointments.length,
         itemBuilder: (_, i) {
-          // ✅ أول عنصر: العداد
-          if (i == 0) {
-            return Card(
-              elevation: 2,
-              color: Colors.blue.shade50,
-              margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'عدد المواعيد الحالية:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: Color(0xFF1976D2),
-                      ),
-                    ),
-                    Text(
-                      appointments.length.toString(),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: Color(0xFF0D47A1),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          // ✅ باقي العناصر: المواعيد
-          final a = appointments[i - 1];
+          final a = appointments[i];
           final patientName =
               a['patient']?['fullName'] ?? a['patientName'] ?? 'Patient';
           final startsAtStr = a['startsAt'] ?? '';
@@ -280,9 +250,9 @@ class _AppointmentsTab extends StatelessWidget {
                     );
                   }
                 },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'confirmed', child: Text('تأكيد')),
-                  const PopupMenuItem(value: 'rejected', child: Text('رفض')),
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'confirmed', child: Text('تأكيد')),
+                  PopupMenuItem(value: 'rejected', child: Text('رفض')),
                 ],
               ),
             ),
@@ -293,7 +263,7 @@ class _AppointmentsTab extends StatelessWidget {
   }
 }
 
-/// 🔹 تبويب المرضى مع عداد عدد المرضى
+/// 🔹 تبويب المرضى
 class _PatientsTab extends StatefulWidget {
   const _PatientsTab();
 
@@ -322,21 +292,21 @@ class _PatientsTabState extends State<_PatientsTab> {
           final p = a['patient'];
           if (p != null) {
             final id = p['id'].toString();
-            if (!uniquePatients.containsKey(id)) {
-              uniquePatients[id] = {
+            uniquePatients.putIfAbsent(id, () {
+              return {
                 'id': p['id'],
                 'name': p['fullName'] ?? 'Patient',
                 'lastAppointment': a['startsAt'] ?? '',
                 'status': a['status'] ?? 'Pending',
               };
-            }
+            });
           }
         }
       }
 
       setState(() => _patients = uniquePatients.values.toList());
     } catch (e) {
-      print("🔴 loadPatients error: $e");
+      debugPrint("loadPatients error: $e");
       setState(() => _patients = []);
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -377,43 +347,9 @@ class _PatientsTabState extends State<_PatientsTab> {
       color: const Color(0xFF1976D2),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: _patients.length + 1,
+        itemCount: _patients.length,
         itemBuilder: (_, i) {
-          if (i == 0) {
-            return Card(
-              elevation: 2,
-              color: Colors.green.shade50,
-              margin: const EdgeInsets.only(bottom: 12),
-              shape:
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'عدد المرضى المسجلين:',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Colors.teal),
-                    ),
-                    Text(
-                      _patients.length.toString(),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: Colors.teal,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          final p = _patients[i - 1];
+          final p = _patients[i];
           final dateStr = p['lastAppointment'] ?? '';
           DateTime? date;
           try {
@@ -426,12 +362,30 @@ class _PatientsTabState extends State<_PatientsTab> {
           return Card(
             elevation: 3,
             margin: const EdgeInsets.only(bottom: 12),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
             child: ListTile(
               onTap: () {
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => DoctorPatientDetailsScreen(patient: p),
+                Navigator.of(context).push(PageRouteBuilder(
+                  transitionDuration: const Duration(milliseconds: 400),
+                  pageBuilder: (context, animation, secondaryAnimation) =>
+                      DoctorPatientDetailsScreen(patient: {
+                    'id': p['id'] ?? '',
+                    'name': p['name'] ?? 'Patient',
+                  }),
+                  transitionsBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                    const begin = Offset(1.0, 0.0);
+                    const end = Offset.zero;
+                    const curve = Curves.easeInOut;
+                    final tween = Tween(begin: begin, end: end)
+                        .chain(CurveTween(curve: curve));
+                    return SlideTransition(
+                      position: animation.drive(tween),
+                      child: child,
+                    );
+                  },
                 ));
               },
               contentPadding:
@@ -476,11 +430,11 @@ class _ProfileTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Card(
+        const Card(
           elevation: 3,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: const ListTile(
+              RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
+          child: ListTile(
             leading: CircleAvatar(child: Icon(Icons.person)),
             title: Text('بيانات الطبيب'),
             subtitle: Text('معلومات الحساب'),
