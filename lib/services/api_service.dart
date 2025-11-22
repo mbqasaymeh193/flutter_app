@@ -174,8 +174,9 @@ class ApiService {
     }
 
     try {
-      // لو عندك مسار مختلف عدّله هنا فقط
-      final url = Uri.parse("${AppConfig.apiBaseUrl}/doctor/appointments");
+      // ✅ مطابق للباك: GET /api/appointments/doctor
+      final url =
+          Uri.parse("${AppConfig.apiBaseUrl}/appointments/doctor");
       final res = await http.get(
         url,
         headers: {
@@ -201,7 +202,7 @@ class ApiService {
     }
   }
 
-  // 🔁 تطبيع قيم الحالة لتوافق الـ Backend (احتمال Enum)
+  // 🔁 تطبيع قيم الحالة لتوافق الـ Backend
   static String _normalizeStatus(String s) {
     final lower = s.toLowerCase();
     if (lower == 'confirmed') return 'Confirmed';
@@ -231,25 +232,27 @@ class ApiService {
     }
 
     final normalizedStatus = _normalizeStatus(status);
+    print("🔄 updateAppointmentStatus => id=$intId, status=$status, normalized=$normalizedStatus");
 
     try {
-      // ✅ هنا المسار كما في الـ API:
-      // PUT /api/appointments/{id}/status
-      final url = Uri.parse(
-        "${AppConfig.apiBaseUrl}/appointments/$intId/status",
-      );
+      // ✅ مطابق للباك: PUT /api/appointments/{id}/status
+      // والباك يستقبل [FromBody] string status → نص خام
+      final url =
+          Uri.parse("${AppConfig.apiBaseUrl}/appointments/$intId/status");
 
       final res = await http.put(
         url,
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "text/plain; charset=utf-8",
           "Authorization": "Bearer $token",
         },
-        body: jsonEncode({"status": normalizedStatus}),
+        // 🟢 نرسل نص عادي بدون JSON:
+        // body: Confirmed أو Rejected
+        body: normalizedStatus,
       );
 
       final shortBody =
-          res.body.length > 300 ? res.body.substring(0, 300) + '…' : res.body;
+          res.body.length > 300 ? '${res.body.substring(0, 300)}…' : res.body;
 
       print("🔄 updateAppointmentStatus [$intId] => ${res.statusCode}");
       print("🔄 updateAppointmentStatus body: $shortBody");

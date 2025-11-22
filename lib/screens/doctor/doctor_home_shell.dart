@@ -21,11 +21,15 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
   bool _loadingAppointments = true;
   List<dynamic> _appointments = [];
 
+  // ✅ مفتاح للوصول إلى حالة تبويب المرضى (لزر التحديث في AppBar)
+  final GlobalKey<_PatientsTabState> _patientsTabKey = GlobalKey<_PatientsTabState>();
+
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialTab.clamp(0, 4);
-    _pageController = PageController(keepPage: true, initialPage: _currentIndex);
+    _pageController =
+        PageController(keepPage: true, initialPage: _currentIndex);
     _loadAppointments();
   }
 
@@ -34,8 +38,11 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
     setState(() => _loadingAppointments = true);
     try {
       final data = await ApiService.getDoctorAppointments();
-      setState(() => _appointments = (data ?? []));
-    } catch (_) {
+      final list = (data ?? []) as List<dynamic>;
+      print("📅 DoctorHomeShell: loaded ${list.length} appointments");
+      setState(() => _appointments = list);
+    } catch (e) {
+      debugPrint("DoctorHomeShell _loadAppointments error: $e");
       setState(() => _appointments = []);
     } finally {
       if (mounted) setState(() => _loadingAppointments = false);
@@ -69,21 +76,35 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ تجهيز أزرار الـ AppBar حسب التبويب
+    List<Widget>? appBarActions;
+    if (_currentIndex == 1) {
+      // تبويب المواعيد
+      appBarActions = [
+        IconButton(
+          tooltip: 'تحديث المواعيد',
+          onPressed: _loadAppointments,
+          icon: const Icon(Icons.refresh),
+        ),
+      ];
+    } else if (_currentIndex == 2) {
+      // تبويب المرضى
+      appBarActions = [
+        IconButton(
+          tooltip: 'تحديث المرضى',
+          onPressed: () => _patientsTabKey.currentState?._loadPatients(),
+          icon: const Icon(Icons.refresh),
+        ),
+      ];
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FB),
       appBar: AppBar(
         title: Text(_titleForIndex(_currentIndex)),
         backgroundColor: const Color(0xFF1976D2),
         elevation: 2,
-        actions: _currentIndex == 1
-            ? [
-                IconButton(
-                  tooltip: 'تحديث المواعيد',
-                  onPressed: _loadAppointments,
-                  icon: const Icon(Icons.refresh),
-                )
-              ]
-            : null,
+        actions: appBarActions,
       ),
       body: PageView(
         controller: _pageController,
@@ -95,7 +116,7 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
             appointments: _appointments,
             onRefresh: _loadAppointments,
           ),
-          const _PatientsTab(),
+          _PatientsTab(key: _patientsTabKey),
           const _ProfileTab(),
           const _SettingsTab(),
         ],
@@ -184,6 +205,13 @@ class _AppointmentsTab extends StatelessWidget {
     }
   }
 
+  String _statusLabel(String s) {
+    final lower = s.toLowerCase();
+    if (lower == 'confirmed' || lower == 'accepted') return 'مؤكد';
+    if (lower == 'rejected') return 'مرفوض';
+    return 'قيد الانتظار';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (loading) {
@@ -203,7 +231,7 @@ class _AppointmentsTab extends StatelessWidget {
           final a = appointments[i];
           final patientName =
               a['patient']?['fullName'] ?? a['patientName'] ?? 'Patient';
-          final startsAtStr = a['startsAt'] ?? '';
+          final startsAtStr = a['startsAt']?.toString() ?? '';
           DateTime? startsAt;
           try {
             startsAt = DateTime.tryParse(startsAtStr);
@@ -225,9 +253,14 @@ class _AppointmentsTab extends StatelessWidget {
                 backgroundColor: const Color(0x221976D2),
                 child: const Icon(Icons.person, color: Color(0xFF1976D2)),
               ),
-              title: Text(patientName,
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text(dateText),
+              title: Text(
+                patientName,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(
+                '$dateText\nالحالة: ${_statusLabel(status)}',
+                maxLines: 2,
+              ),
               trailing: PopupMenuButton<String>(
                 icon: Icon(
                   Icons.more_vert,
@@ -235,18 +268,23 @@ class _AppointmentsTab extends StatelessWidget {
                 ),
                 onSelected: (value) async {
                   final ok = await ApiService.updateAppointmentStatus(
-                      a['id'], value);
+                    a['id'],
+                    value,
+                  );
                   if (ok) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(value == 'confirmed'
-                          ? 'تم تأكيد الموعد ✅'
-                          : 'تم رفض الموعد ❌'),
+                      content: Text(
+                        value == 'confirmed'
+                            ? 'تم تأكيد الموعد ✅'
+                            : 'تم رفض الموعد ❌',
+                      ),
                     ));
                     onRefresh();
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                          content: Text('فشل في تحديث حالة الموعد')),
+                        content: Text('فشل في تحديث حالة الموعد'),
+                      ),
                     );
                   }
                 },
@@ -265,7 +303,7 @@ class _AppointmentsTab extends StatelessWidget {
 
 /// 🔹 تبويب المرضى
 class _PatientsTab extends StatefulWidget {
-  const _PatientsTab();
+  const _PatientsTab({super.key});
 
   @override
   State<_PatientsTab> createState() => _PatientsTabState();
@@ -281,6 +319,7 @@ class _PatientsTabState extends State<_PatientsTab> {
     _loadPatients();
   }
 
+  // ⚠ استدعيناها من الـ AppBar في DoctorHomeShell عبر GlobalKey
   Future<void> _loadPatients() async {
     setState(() => _loading = true);
     try {
@@ -304,6 +343,8 @@ class _PatientsTabState extends State<_PatientsTab> {
         }
       }
 
+      print("👥 PatientsTab: loaded ${uniquePatients.length} patients");
+
       setState(() => _patients = uniquePatients.values.toList());
     } catch (e) {
       debugPrint("loadPatients error: $e");
@@ -323,6 +364,13 @@ class _PatientsTabState extends State<_PatientsTab> {
       default:
         return Colors.orange;
     }
+  }
+
+  String _statusLabel(String s) {
+    final lower = s.toLowerCase();
+    if (lower == 'confirmed' || lower == 'accepted') return 'مؤكد';
+    if (lower == 'rejected') return 'مرفوض';
+    return 'قيد الانتظار';
   }
 
   @override
@@ -390,12 +438,14 @@ class _PatientsTabState extends State<_PatientsTab> {
               },
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              leading: CircleAvatar(
-                backgroundColor: const Color(0x221976D2),
-                child: const Icon(Icons.person, color: Color(0xFF1976D2)),
+              leading: const CircleAvatar(
+                backgroundColor: Color(0x221976D2),
+                child: Icon(Icons.person, color: Color(0xFF1976D2)),
               ),
-              title: Text(p['name'],
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              title: Text(
+                p['name'],
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               subtitle: Text('آخر موعد: $formatted'),
               trailing: Container(
                 padding:
@@ -405,7 +455,7 @@ class _PatientsTabState extends State<_PatientsTab> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  p['status'],
+                  _statusLabel(p['status']),
                   style: TextStyle(
                     color: _statusColor(p['status']),
                     fontWeight: FontWeight.w600,
@@ -432,8 +482,8 @@ class _ProfileTab extends StatelessWidget {
       children: [
         const Card(
           elevation: 3,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(16))),
           child: ListTile(
             leading: CircleAvatar(child: Icon(Icons.person)),
             title: Text('بيانات الطبيب'),

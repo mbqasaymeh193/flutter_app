@@ -11,6 +11,7 @@ import 'package:healthcare_flutter_app/screens/auth/reset_password_screen.dart';
 import 'package:healthcare_flutter_app/screens/change_password_screen.dart';
 import 'package:healthcare_flutter_app/screens/patient/patient_home_shell.dart';
 import 'package:healthcare_flutter_app/screens/admin/admin_home_shell.dart';
+import 'package:healthcare_flutter_app/screens/patient/patient_appointments_screen.dart'; // ✅ جديد
 import '../../screens/auth/register_success_screen.dart';
 
 class AppRoutes {
@@ -24,6 +25,7 @@ class AppRoutes {
 
   // Patient
   static const String patientHomeShell = '/patientHomeShell';
+  static const String patientAppointments = '/patientAppointments'; // ✅ جديد
 
   // Doctor (كلها تفتح نفس الـShell مع تبويب مختلف)
   static const String doctorHomeShell = '/doctorHomeShell';
@@ -62,6 +64,10 @@ class AppRoutes {
       // Patient
       case patientHomeShell:
         return MaterialPageRoute(builder: (_) => const PatientHomeShell());
+      case patientAppointments: // ✅ جديد
+        return MaterialPageRoute(
+          builder: (_) => const PatientAppointmentsScreen(),
+        );
 
       // Doctor routes → نفس الـShell مع تبويب مناسب
       case doctorHomeShell:
@@ -94,8 +100,10 @@ class AppRoutes {
           builder: (_) => Scaffold(
             appBar: AppBar(title: const Text('الصفحة غير موجودة')),
             body: Center(
-              child: Text('Route "${settings.name}" غير معرّف ❌',
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              child: Text(
+                'Route "${settings.name}" غير معرّف ❌',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
             ),
           ),
         );

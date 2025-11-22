@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../services/api_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
@@ -16,6 +17,17 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
   TimeOfDay? selectedTime;
   bool _loading = false;
 
+  // ✅ اسم الدكتور من أكثر من احتمال (fullName أو name)
+  String get _doctorName {
+    return widget.doctor['fullName'] ??
+        widget.doctor['name'] ??
+        widget.doctor['doctorName'] ??
+        'Doctor';
+  }
+
+  // ✅ ID الدكتور مع حماية للأنواع
+  dynamic get _doctorIdRaw => widget.doctor['id'] ?? widget.doctor['doctorId'];
+
   Future<void> pickDate() async {
     final now = DateTime.now();
     final date = await showDatePicker(
@@ -24,18 +36,30 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
     );
-    if (date != null) setState(() => selectedDate = date);
+    if (date != null) {
+      setState(() => selectedDate = date);
+    }
   }
 
   Future<void> pickTime() async {
-    final time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-    if (time != null) setState(() => selectedTime = time);
+    final time =
+        await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    if (time != null) {
+      setState(() => selectedTime = time);
+    }
   }
 
   Future<void> bookAppointment() async {
     if (selectedDate == null || selectedTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select date and time")),
+        const SnackBar(content: Text("الرجاء اختيار التاريخ والوقت أولاً")),
+      );
+      return;
+    }
+
+    if (_doctorIdRaw == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("حدث خطأ في بيانات الطبيب")),
       );
       return;
     }
@@ -49,10 +73,11 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
       selectedTime!.hour,
       selectedTime!.minute,
     );
+    // ⏱ مدة الموعد 30 دقيقة كما في الكود الأصلي
     final end = start.add(const Duration(minutes: 30));
 
     final success = await ApiService.bookAppointment(
-      doctorId: widget.doctor['id'],
+      doctorId: _doctorIdRaw,
       startsAt: start,
       endsAt: end,
     );
@@ -61,29 +86,50 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Appointment booked successfully")),
+        SnackBar(
+          content: Text("تم حجز الموعد بنجاح مع $_doctorName ✅"),
+        ),
       );
-      Navigator.pop(context);
+      Navigator.pop(context, true); // نرجع بنتيجة نجاح (اختياري)
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to book appointment")),
+        const SnackBar(content: Text("فشل في حجز الموعد، حاول مرة أخرى")),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final dateText = selectedDate == null
+        ? "اختر التاريخ"
+        : DateFormat('y/MM/dd').format(selectedDate!);
+
+    final timeText =
+        selectedTime == null ? "اختر الوقت" : selectedTime!.format(context);
+
     return Scaffold(
-      appBar: AppBar(title: Text("Book ${widget.doctor['fullName']}")),
+      appBar: AppBar(
+        title: Text("حجز موعد مع $_doctorName"),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            CustomButton(text: selectedDate == null ? "Pick Date" : selectedDate!.toLocal().toString().split(' ')[0], onPressed: pickDate),
+            CustomButton(
+              text: dateText,
+              onPressed: _loading ? null : pickDate,
+            ),
             const SizedBox(height: 16),
-            CustomButton(text: selectedTime == null ? "Pick Time" : selectedTime!.format(context), onPressed: pickTime),
+            CustomButton(
+              text: timeText,
+              onPressed: _loading ? null : pickTime,
+            ),
             const SizedBox(height: 32),
-            CustomButton(text: "Book Appointment", onPressed: bookAppointment, isLoading: _loading),
+            CustomButton(
+              text: "تأكيد الحجز",
+              onPressed: _loading ? null : bookAppointment,
+              isLoading: _loading,
+            ),
           ],
         ),
       ),

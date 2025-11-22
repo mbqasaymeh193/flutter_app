@@ -44,7 +44,7 @@ class _AdminHomeShellState extends State<AdminHomeShell>
       List<Map<String, dynamic>> castList(dynamic src) {
         if (src is List) {
           return src
-              .where((e) => e is Map<String, dynamic>)
+              .whereType<Map<String, dynamic>>()
               .map<Map<String, dynamic>>((e) => e as Map<String, dynamic>)
               .toList();
         }
