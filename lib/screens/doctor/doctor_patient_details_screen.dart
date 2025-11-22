@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:healthcare_flutter_app/services/api_service.dart';
 import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
-import 'doctor_home_shell.dart'; // ✅ لإرجاع الطبيب إلى الصفحة الرئيسية بالحركة
 
 class DoctorPatientDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> patient;
@@ -28,15 +27,17 @@ class _DoctorPatientDetailsScreenState
   Future<void> _loadAppointments() async {
     setState(() => _loading = true);
     try {
-      final allAppointments = await ApiService.getDoctorAppointments();
-      final filtered = allAppointments!
+      final allAppointments = await ApiService.getDoctorAppointments() ?? [];
+      final filtered = allAppointments
           .where((a) =>
               a['patient']?['id']?.toString() ==
               widget.patient['id'].toString())
           .toList();
       setState(() => _appointments = filtered);
+      debugPrint(
+          "🩺 DoctorPatientDetails: loaded ${filtered.length} appointments for patient ${widget.patient['id']}");
     } catch (e) {
-      print("⚠️ loadAppointments error: $e");
+      debugPrint("⚠️ loadAppointments error: $e");
       setState(() => _appointments = []);
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -55,6 +56,13 @@ class _DoctorPatientDetailsScreenState
     }
   }
 
+  String _statusLabel(String s) {
+    final lower = s.toLowerCase();
+    if (lower == 'confirmed' || lower == 'accepted') return 'مؤكد';
+    if (lower == 'rejected') return 'مرفوض';
+    return 'قيد الانتظار';
+  }
+
   @override
   Widget build(BuildContext context) {
     final patientName = widget.patient['name'] ?? 'Patient';
@@ -66,8 +74,8 @@ class _DoctorPatientDetailsScreenState
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new),
           onPressed: () {
-            Navigator.of(context)
-                .pushReplacement(slideBackRoute(const DoctorHomeShell()));
+            // ✅ رجوع طبيعي لنفس شاشة المرضى (PatientsTab) مع الحركة العكسية
+            Navigator.pop(context);
           },
         ),
       ),
@@ -87,7 +95,7 @@ class _DoctorPatientDetailsScreenState
                     itemCount: _appointments.length,
                     itemBuilder: (_, i) {
                       final a = _appointments[i];
-                      final startsAtStr = a['startsAt'] ?? '';
+                      final startsAtStr = a['startsAt']?.toString() ?? '';
                       DateTime? startsAt;
                       try {
                         startsAt = DateTime.tryParse(startsAtStr);
@@ -111,7 +119,7 @@ class _DoctorPatientDetailsScreenState
                                 color: Color(0xFF1976D2)),
                           ),
                           title: Text(dateText),
-                          subtitle: Text('الحالة: $status'),
+                          subtitle: Text('الحالة: ${_statusLabel(status)}'),
                           trailing: PopupMenuButton<String>(
                             icon: Icon(Icons.more_vert,
                                 color: _statusColor(status)),
@@ -171,9 +179,12 @@ class _DoctorPatientDetailsScreenState
                                         TextButton(
                                           onPressed: () {
                                             Navigator.pop(ctx);
-                                            Navigator.pushReplacementNamed(
-                                                context,
-                                                AppRoutes.doctorDashboard);
+                                            // ✅ رجوع إلى تبويب مرضاي في Shell الطبيب
+                                            Navigator.pushNamedAndRemoveUntil(
+                                              context,
+                                              AppRoutes.doctorPatients,
+                                              (route) => false,
+                                            );
                                           },
                                           child: const Text(
                                             'رجوع إلى المرضى',
@@ -208,8 +219,8 @@ class _DoctorPatientDetailsScreenState
                                 } else {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                        content:
-                                            Text('فشل في تحديث حالة الموعد ❌')),
+                                        content: Text(
+                                            'فشل في تحديث حالة الموعد ❌')),
                                   );
                                 }
                               }
@@ -236,25 +247,6 @@ class _DoctorPatientDetailsScreenState
                     },
                   ),
                 ),
-    );
-  }
-
-  // ✅ حركة الرجوع بسلاسة من اليسار إلى اليمين
-  Route slideBackRoute(Widget page) {
-    return PageRouteBuilder(
-      transitionDuration: const Duration(milliseconds: 400),
-      pageBuilder: (context, animation, secondaryAnimation) => page,
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        const begin = Offset(-1.0, 0.0); // من اليسار إلى اليمين
-        const end = Offset.zero;
-        const curve = Curves.easeInOut;
-        final tween =
-            Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-        return SlideTransition(
-          position: animation.drive(tween),
-          child: child,
-        );
-      },
     );
   }
 }
