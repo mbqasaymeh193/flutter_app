@@ -165,7 +165,7 @@ class _DoctorConfirmAppointmentsScreenState
                             } catch (_) {}
                             final dateText = startsAt == null
                                 ? startsAtStr
-                                : '${startsAt.toLocal().toString().substring(0, 16)}';
+                                : startsAt.toLocal().toString().substring(0, 16);
 
                             final status =
                                 (a['status'] ?? 'Pending').toString();

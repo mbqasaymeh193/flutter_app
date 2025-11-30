@@ -13,6 +13,7 @@ import 'package:healthcare_flutter_app/screens/patient/patient_home_shell.dart';
 import 'package:healthcare_flutter_app/screens/admin/admin_home_shell.dart';
 import 'package:healthcare_flutter_app/screens/patient/patient_appointments_screen.dart'; // ✅ جديد
 import '../../screens/auth/register_success_screen.dart';
+import '../../screens/doctor/doctor_patients_screen.dart';
 
 class AppRoutes {
   // Auth
@@ -26,6 +27,8 @@ class AppRoutes {
   // Patient
   static const String patientHomeShell = '/patientHomeShell';
   static const String patientAppointments = '/patientAppointments'; // ✅ جديد
+  static const String doctorPatientsScreen = '/doctorPatientsScreen';
+
 
   // Doctor (كلها تفتح نفس الـShell مع تبويب مختلف)
   static const String doctorHomeShell = '/doctorHomeShell';
@@ -93,6 +96,9 @@ class AppRoutes {
       // Admin
       case adminDashboard:
         return MaterialPageRoute(builder: (_) => const AdminHomeShell());
+      case doctorPatientsScreen:
+        return MaterialPageRoute(builder: (_) => const DoctorPatientsScreen());
+  
 
       // 404
       default:

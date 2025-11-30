@@ -38,7 +38,7 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
     setState(() => _loadingAppointments = true);
     try {
       final data = await ApiService.getDoctorAppointments();
-      final list = (data ?? []) as List<dynamic>;
+      final list = (data ?? []);
       print("📅 DoctorHomeShell: loaded ${list.length} appointments");
       setState(() => _appointments = list);
     } catch (e) {
@@ -326,7 +326,7 @@ class _PatientsTabState extends State<_PatientsTab> {
       final data = await ApiService.getDoctorAppointments();
       final uniquePatients = <String, Map<String, dynamic>>{};
 
-      if (data != null && data.isNotEmpty) {
+      if (data.isNotEmpty) {
         for (final a in data) {
           final p = a['patient'];
           if (p != null) {

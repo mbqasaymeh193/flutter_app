@@ -35,7 +35,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
       });
 
       debugPrint(
-          "📊 DoctorDashboard: loaded ${appointments?.length ?? 0} appointments");
+          "📊 DoctorDashboard: loaded ${appointments.length ?? 0} appointments");
     } catch (e) {
       debugPrint("DoctorDashboard _loadAppointments error: $e");
       setState(() {
