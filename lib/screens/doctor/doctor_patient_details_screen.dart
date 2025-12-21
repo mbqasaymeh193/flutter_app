@@ -710,7 +710,7 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
               Text('المريض: $_patientName'),
               if (_patientId != null)
                 Text(
-                  'ID: ${_patientId}',
+                  'ID: $_patientId',
                   style: const TextStyle(fontSize: 11, color: Colors.white70),
                 ),
             ],

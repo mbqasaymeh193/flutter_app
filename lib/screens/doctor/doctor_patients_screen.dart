@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:healthcare_flutter_app/services/api_service.dart';
 // لو أعطاك خطأ على .characters أضف هذا السطر:
-import 'package:characters/characters.dart';
 
 import 'doctor_patient_details_screen.dart';
 
