@@ -3,6 +3,7 @@ import 'core/routes/app_routes.dart';
 import 'core/theme/app_colors.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const HospitalApp());
 }
 
@@ -25,7 +26,8 @@ class HospitalApp extends StatelessWidget {
           centerTitle: true,
         ),
       ),
-      initialRoute: '/login_screen', // يمكنك تغييره مثل: AppRoutes.patientDashboard
+      // ✅ بدل ما نبدأ بـ login مباشرة: نبدأ ببوابة تتحقق من التوكن والدور
+      initialRoute: '/login_screen',
       onGenerateRoute: AppRoutes.generateRoute,
     );
   }
