@@ -4,31 +4,53 @@ import '../../services/api_service.dart';
 class DoctorAddMedicalRecordScreen extends StatefulWidget {
   final int patientId;
   final String patientName;
-  final int? appointmentId; // اختياري (للواجهة فقط الآن)
+
+  // ✅ edit mode (اختياري)
+  final int? recordId;
+  final String? initialDiagnosis;
+  final String? initialNotes;
+  final String? initialMedication;
+  final String? initialAllergies;
+  final String? initialSideEffects;
 
   const DoctorAddMedicalRecordScreen({
     super.key,
     required this.patientId,
     required this.patientName,
-    this.appointmentId,
+    this.recordId,
+    this.initialDiagnosis,
+    this.initialNotes,
+    this.initialMedication,
+    this.initialAllergies,
+    this.initialSideEffects,
   });
 
   @override
-  State<DoctorAddMedicalRecordScreen> createState() =>
-      _DoctorAddMedicalRecordScreenState();
+  State<DoctorAddMedicalRecordScreen> createState() => _DoctorAddMedicalRecordScreenState();
 }
 
-class _DoctorAddMedicalRecordScreenState
-    extends State<DoctorAddMedicalRecordScreen> {
+class _DoctorAddMedicalRecordScreenState extends State<DoctorAddMedicalRecordScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final _diagnosis = TextEditingController();
-  final _notes = TextEditingController();
-  final _medication = TextEditingController();
-  final _allergies = TextEditingController();
-  final _sideEffects = TextEditingController();
+  late final TextEditingController _diagnosis;
+  late final TextEditingController _notes;
+  late final TextEditingController _medication;
+  late final TextEditingController _allergies;
+  late final TextEditingController _sideEffects;
 
   bool _loading = false;
+
+  bool get _isEdit => widget.recordId != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _diagnosis = TextEditingController(text: widget.initialDiagnosis ?? '');
+    _notes = TextEditingController(text: widget.initialNotes ?? '');
+    _medication = TextEditingController(text: widget.initialMedication ?? '');
+    _allergies = TextEditingController(text: widget.initialAllergies ?? '');
+    _sideEffects = TextEditingController(text: widget.initialSideEffects ?? '');
+  }
 
   @override
   void dispose() {
@@ -40,42 +62,61 @@ class _DoctorAddMedicalRecordScreenState
     super.dispose();
   }
 
+  String? _req(String? v, String msg) {
+    if (v == null || v.trim().isEmpty) return msg;
+    return null;
+  }
+
   Future<void> _submit() async {
-    if (_loading) return; // ✅ منع ضغط متكرر
-    final form = _formKey.currentState;
-    if (form == null || !form.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _loading = true);
 
+    final diagnosis = _diagnosis.text.trim();
+    final notes = _notes.text.trim();
+    final medication = _medication.text.trim().isEmpty ? null : _medication.text.trim();
+    final allergies = _allergies.text.trim().isEmpty ? null : _allergies.text.trim();
+    final sideEffects = _sideEffects.text.trim().isEmpty ? null : _sideEffects.text.trim();
+
     try {
-      final ok = await ApiService.createMedicalRecord(
-        patientId: widget.patientId,
-        diagnosis: _diagnosis.text.trim(),
-        notes: _notes.text.trim(),
-        medication:
-            _medication.text.trim().isEmpty ? null : _medication.text.trim(),
-        allergies:
-            _allergies.text.trim().isEmpty ? null : _allergies.text.trim(),
-        sideEffects:
-            _sideEffects.text.trim().isEmpty ? null : _sideEffects.text.trim(),
-      );
+      final bool ok;
 
-      if (!mounted) return;
-
-      if (ok == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم حفظ السجل الطبي ✅')),
+      if (_isEdit) {
+        ok = await ApiService.updateMedicalRecord(
+          recordId: widget.recordId!,
+          diagnosis: diagnosis,
+          notes: notes,
+          medication: medication,
+          allergies: allergies,
+          sideEffects: sideEffects,
         );
-        Navigator.pop(context, true); // ✅ يرجّع true للشاشة السابقة تعمل Refresh
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فشل حفظ السجل الطبي ❌')),
+        ok = await ApiService.createMedicalRecord(
+          patientId: widget.patientId,
+          diagnosis: diagnosis,
+          notes: notes,
+          medication: medication,
+          allergies: allergies,
+          sideEffects: sideEffects,
         );
       }
-    } catch (e) {
+
+      if (!mounted) return;
+
+      if (ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_isEdit ? 'تم تعديل السجل ✅' : 'تم حفظ السجل الطبي ✅')),
+        );
+        Navigator.pop(context, true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_isEdit ? 'فشل تعديل السجل ❌' : 'فشل حفظ السجل ❌')),
+        );
+      }
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('حدث خطأ أثناء الحفظ: $e')),
+        const SnackBar(content: Text('حدث خطأ أثناء العملية')),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -93,14 +134,8 @@ class _DoctorAddMedicalRecordScreenState
 
   @override
   Widget build(BuildContext context) {
-    final subtitle = widget.appointmentId == null
-        ? 'سيتم إنشاء سجل للمريض المختار'
-        : 'موعد رقم #${widget.appointmentId}';
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('إضافة سجل طبي'),
-      ),
+      appBar: AppBar(title: Text(_isEdit ? 'تعديل سجل طبي' : 'إضافة سجل طبي')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -109,11 +144,8 @@ class _DoctorAddMedicalRecordScreenState
               Card(
                 child: ListTile(
                   leading: const CircleAvatar(child: Icon(Icons.person)),
-                  title: Text(
-                    widget.patientName,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  subtitle: Text('$subtitle • Patient ID: ${widget.patientId}'),
+                  title: Text(widget.patientName, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text(_isEdit ? 'تعديل السجل رقم #${widget.recordId}' : 'إنشاء سجل جديد للمريض'),
                 ),
               ),
               const SizedBox(height: 10),
@@ -124,22 +156,16 @@ class _DoctorAddMedicalRecordScreenState
                     children: [
                       TextFormField(
                         controller: _diagnosis,
-                        decoration:
-                            _dec('Diagnosis', hint: 'مثال: Flu, Allergy...'),
-                        textInputAction: TextInputAction.next,
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Diagnosis مطلوب'
-                            : null,
+                        decoration: _dec('Diagnosis', hint: 'مثال: Flu, Allergy...'),
+                        validator: (v) => _req(v, 'Diagnosis مطلوب'),
                       ),
                       const SizedBox(height: 10),
                       TextFormField(
                         controller: _notes,
                         decoration: _dec('Notes', hint: 'ملاحظات الطبيب'),
                         minLines: 3,
-                        maxLines: 7,
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Notes مطلوبة'
-                            : null,
+                        maxLines: 6,
+                        validator: (v) => _req(v, 'Notes مطلوبة'),
                       ),
                       const SizedBox(height: 10),
                       TextFormField(
@@ -164,13 +190,10 @@ class _DoctorAddMedicalRecordScreenState
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                 )
                               : const Icon(Icons.save),
-                          label: Text(_loading ? 'Saving...' : 'Save Medical Record'),
+                          label: Text(_loading ? 'Saving...' : (_isEdit ? 'Update Medical Record' : 'Save Medical Record')),
                           onPressed: _loading ? null : _submit,
                         ),
                       ),

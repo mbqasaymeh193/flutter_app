@@ -62,7 +62,10 @@ class ApiService {
   }) async {
     http.Response? last;
     for (final p in paths) {
-      final res = await http.get(_url(p), headers: _jsonHeaders(withAuth: withAuth));
+      final res = await http.get(
+        _url(p),
+        headers: _jsonHeaders(withAuth: withAuth),
+      );
       last = res;
       if (!_isNotFound(res)) return res;
     }
@@ -138,7 +141,6 @@ class ApiService {
   }
 
   /// 🧾 إنشاء حساب جديد (حسب باك اندك: FirstName/LastName/NationalId/PhoneNumber)
-  /// ملاحظة: أنت كنت مرسل fullName فقط، وهذا سيكسر التسجيل في الباك اند الحالي.
   static Future<bool> register({
     required String firstName,
     required String lastName,
@@ -158,7 +160,7 @@ class ApiService {
         "nationalId": nationalId,
         "phoneNumber": phoneNumber,
         "role": role,
-        "specialty": specialty, // إذا null لا مشكلة
+        "specialty": specialty, // إذا null لا مشكلة (لكن للطبيب لازم تكون موجودة من UI)
       };
 
       final res = await http.post(
@@ -181,7 +183,6 @@ class ApiService {
   }
 
   // ⚠️ هذه الـ endpoints غير موجودة في Swagger اللي عندك حالياً.
-  // إذا ما عندك باك اند لها: اتركها لكن لن تعمل (لن تكسر التطبيق إلا إذا استدعيتها).
   static Future<bool> forgotPassword(String email) async {
     try {
       final res = await http.post(
@@ -562,11 +563,6 @@ class ApiService {
         }),
       );
 
-      // ignore: avoid_print
-      print("📝 createMedicalRecord status: ${res.statusCode}");
-      // ignore: avoid_print
-      print("📝 createMedicalRecord body: ${res.body}");
-
       return res.statusCode == 200 || res.statusCode == 201;
     } catch (e) {
       // ignore: avoid_print
@@ -575,7 +571,40 @@ class ApiService {
     }
   }
 
-  /// ✅ سجلات مريض محدد (Doctor)
+  /// ✅ تحديث سجل طبي (Doctor only)
+  static Future<bool> updateMedicalRecord({
+    required int recordId,
+    required String diagnosis,
+    required String notes,
+    String? medication,
+    String? allergies,
+    String? sideEffects,
+  }) async {
+    await loadToken();
+    if (token == null) return false;
+
+    try {
+      final res = await http.put(
+        _url("/api/medical-records/$recordId"),
+        headers: _jsonHeaders(withAuth: true),
+        body: jsonEncode({
+          "diagnosis": diagnosis,
+          "notes": notes,
+          "medication": medication,
+          "allergies": allergies,
+          "sideEffects": sideEffects,
+        }),
+      );
+
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (e) {
+      // ignore: avoid_print
+      print("updateMedicalRecord error: $e");
+      return false;
+    }
+  }
+
+  /// ✅ سجلات مريض معيّن للطبيب
   static Future<List<dynamic>> getMedicalRecordsForPatient(int patientId) async {
     await loadToken();
     if (token == null) return [];
@@ -585,9 +614,6 @@ class ApiService {
         _url("/api/medical-records/patient/$patientId"),
         headers: _jsonHeaders(withAuth: true),
       );
-
-      // ignore: avoid_print
-      print("📚 getMedicalRecordsForPatient status: ${res.statusCode}");
 
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
@@ -601,7 +627,7 @@ class ApiService {
     }
   }
 
-  /// ✅ سجلاتي أنا (Patient)
+  /// ✅ سجلاتي أنا كمريض (من التوكن)
   static Future<List<dynamic>> getMyMedicalRecords() async {
     await loadToken();
     if (token == null) return [];
@@ -611,9 +637,6 @@ class ApiService {
         _url("/api/medical-records/mine"),
         headers: _jsonHeaders(withAuth: true),
       );
-
-      // ignore: avoid_print
-      print("📚 getMyMedicalRecords status: ${res.statusCode}");
 
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
@@ -629,14 +652,14 @@ class ApiService {
 
   // ================= Doctor Patients Helper =================
 
-  /// ✅ (حل عملي) استخرج قائمة مرضى فريدين من مواعيد الطبيب
-  /// يريحك من أي endpoint إضافي
+  /// ✅ استخرج قائمة مرضى فريدين من مواعيد الطبيب (بدون endpoint إضافي)
   static Future<List<Map<String, dynamic>>> getPatientsFromDoctorAppointments() async {
     final apps = await getDoctorAppointments();
     final Map<int, Map<String, dynamic>> unique = {};
 
     for (final a in apps) {
       if (a is! Map) continue;
+
       final patient = a['patient'];
       if (patient is Map) {
         final id = int.tryParse(patient['id']?.toString() ?? '');
@@ -648,7 +671,6 @@ class ApiService {
           "phoneNumber": patient['phoneNumber']?.toString(),
         };
       } else {
-        // fallback إذا الباك رجع patientName فقط
         final pid = int.tryParse(a['patientId']?.toString() ?? '');
         if (pid == null) continue;
 
@@ -663,7 +685,6 @@ class ApiService {
   }
 
   /// ✅ إذا عندك Endpoint جاهز للمرضى (اختياري) بنعمل له fallback
-  /// (إن لم يوجد يرجع []
   static Future<List<dynamic>> getDoctorPatients() async {
     await loadToken();
     if (token == null) return [];
@@ -672,7 +693,6 @@ class ApiService {
       final res = await _getWithFallback(
         const [
           "/api/doctor/patients",
-          "/api/doctor/patients-screen",
           "/api/doctor/patients/list",
         ],
         withAuth: true,
