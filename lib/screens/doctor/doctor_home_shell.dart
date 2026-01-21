@@ -147,6 +147,11 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
             label: 'الملف الشخصي',
           ),
           NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: 'السجل الطبي',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
             label: 'الإعدادات',
@@ -463,6 +468,13 @@ class _PatientsTabState extends State<_PatientsTab> {
                   ),
                 ),
               ),
+              ListTile(
+  leading: const Icon(Icons.folder_shared_outlined),
+  title: const Text('سجلاتي الطبية'),
+  subtitle: const Text('عرض التشخيصات والأدوية والملاحظات'),
+  onTap: () => Navigator.pushNamed(context, AppRoutes.doctor_patient_details_screen),
+),
+
             ),
           );
         },

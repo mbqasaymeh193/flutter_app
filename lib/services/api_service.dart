@@ -17,7 +17,7 @@ class ApiService {
 
   /// ✅ تحميل التوكن
   static Future<void> loadToken() async {
-    if (token != null && token!.isNotEmpty) return; // already loaded
+    if (token != null && token!.isNotEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     token = prefs.getString('jwt_token');
   }
@@ -55,7 +55,7 @@ class ApiService {
 
   static bool _isNotFound(http.Response res) => res.statusCode == 404;
 
-  /// Helper: جرّب أكثر من Endpoint لنفس العملية (مفيد لأنك قلت قد لا تكون موجودة)
+  /// Helper: جرّب أكثر من Endpoint لنفس العملية (Fallback)
   static Future<http.Response> _getWithFallback(
     List<String> paths, {
     bool withAuth = false,
@@ -63,6 +63,24 @@ class ApiService {
     http.Response? last;
     for (final p in paths) {
       final res = await http.get(_url(p), headers: _jsonHeaders(withAuth: withAuth));
+      last = res;
+      if (!_isNotFound(res)) return res;
+    }
+    return last ?? http.Response("Not Found", 404);
+  }
+
+  static Future<http.Response> _postWithFallback(
+    List<String> paths, {
+    bool withAuth = false,
+    Map<String, dynamic>? body,
+  }) async {
+    http.Response? last;
+    for (final p in paths) {
+      final res = await http.post(
+        _url(p),
+        headers: _jsonHeaders(withAuth: withAuth),
+        body: body == null ? null : jsonEncode(body),
+      );
       last = res;
       if (!_isNotFound(res)) return res;
     }
@@ -93,7 +111,7 @@ class ApiService {
   static Future<Map<String, dynamic>?> login(String email, String password) async {
     try {
       final res = await http.post(
-        _url("/login"),
+        _url("/api/login"),
         headers: _jsonHeaders(),
         body: jsonEncode({"email": email, "password": password}),
       );
@@ -119,28 +137,32 @@ class ApiService {
     }
   }
 
-  /// 🧾 إنشاء حساب جديد (يدعم الدور والتخصص)
+  /// 🧾 إنشاء حساب جديد (حسب باك اندك: FirstName/LastName/NationalId/PhoneNumber)
+  /// ملاحظة: أنت كنت مرسل fullName فقط، وهذا سيكسر التسجيل في الباك اند الحالي.
   static Future<bool> register({
-    required String fullName,
+    required String firstName,
+    required String lastName,
     required String email,
     required String password,
+    required String nationalId,
+    required String phoneNumber,
     String role = "Patient",
-    String specialty = "General",
+    String? specialty, // للطبيب فقط
   }) async {
     try {
       final body = <String, dynamic>{
-        "fullName": fullName,
+        "firstName": firstName,
+        "lastName": lastName,
         "email": email,
         "password": password,
+        "nationalId": nationalId,
+        "phoneNumber": phoneNumber,
         "role": role,
+        "specialty": specialty, // إذا null لا مشكلة
       };
 
-      if (role.toLowerCase() == "doctor") {
-        body["specialty"] = specialty;
-      }
-
       final res = await http.post(
-        _url("/register"),
+        _url("/api/register"),
         headers: _jsonHeaders(),
         body: jsonEncode(body),
       );
@@ -158,20 +180,15 @@ class ApiService {
     }
   }
 
-  /// 🔑 نسيت كلمة المرور
+  // ⚠️ هذه الـ endpoints غير موجودة في Swagger اللي عندك حالياً.
+  // إذا ما عندك باك اند لها: اتركها لكن لن تعمل (لن تكسر التطبيق إلا إذا استدعيتها).
   static Future<bool> forgotPassword(String email) async {
     try {
       final res = await http.post(
-        _url("/password/forgot"),
+        _url("/api/password/forgot"),
         headers: _jsonHeaders(),
         body: jsonEncode({"email": email}),
       );
-
-      // ignore: avoid_print
-      print("🔑 forgotPassword status: ${res.statusCode}");
-      // ignore: avoid_print
-      print("🔑 forgotPassword body: ${res.body}");
-
       return res.statusCode == 200;
     } catch (e) {
       // ignore: avoid_print
@@ -180,23 +197,16 @@ class ApiService {
     }
   }
 
-  /// 🔐 تغيير كلمة المرور بعد تسجيل الدخول
   static Future<bool> changePassword(String oldPass, String newPass) async {
     await loadToken();
     if (token == null) return false;
 
     try {
       final res = await http.put(
-        _url("/password/change"),
+        _url("/api/password/change"),
         headers: _jsonHeaders(withAuth: true),
         body: jsonEncode({"oldPassword": oldPass, "newPassword": newPass}),
       );
-
-      // ignore: avoid_print
-      print("🔐 changePassword status: ${res.statusCode}");
-      // ignore: avoid_print
-      print("🔐 changePassword body: ${res.body}");
-
       return res.statusCode == 200;
     } catch (e) {
       // ignore: avoid_print
@@ -205,20 +215,13 @@ class ApiService {
     }
   }
 
-  /// 🧩 إعادة تعيين كلمة المرور
   static Future<bool> resetPassword(String email, String newPassword) async {
     try {
       final res = await http.post(
-        _url("/password/reset"),
+        _url("/api/password/reset"),
         headers: _jsonHeaders(),
         body: jsonEncode({"email": email, "newPassword": newPassword}),
       );
-
-      // ignore: avoid_print
-      print("🧩 resetPassword status: ${res.statusCode}");
-      // ignore: avoid_print
-      print("🧩 resetPassword body: ${res.body}");
-
       return res.statusCode == 200;
     } catch (e) {
       // ignore: avoid_print
@@ -229,10 +232,10 @@ class ApiService {
 
   // ==================== Doctors =====================
 
-  /// 👩‍⚕️ جلب قائمة الأطباء
+  /// 👩‍⚕️ جلب قائمة الأطباء (Public)
   static Future<List<dynamic>> getDoctors() async {
     try {
-      final res = await http.get(_url("/doctors"), headers: _jsonHeaders());
+      final res = await http.get(_url("/api/doctors"), headers: _jsonHeaders());
       // ignore: avoid_print
       print("👩‍⚕️ getDoctors status: ${res.statusCode}");
 
@@ -264,7 +267,7 @@ class ApiService {
 
     try {
       final res = await http.post(
-        _url("/appointments/book"),
+        _url("/api/appointments/book"),
         headers: _jsonHeaders(withAuth: true),
         body: jsonEncode({
           "doctorId": id,
@@ -293,7 +296,7 @@ class ApiService {
 
     try {
       final res = await http.get(
-        _url("/appointments/mine"),
+        _url("/api/appointments/mine"),
         headers: _jsonHeaders(withAuth: true),
       );
 
@@ -319,7 +322,7 @@ class ApiService {
 
     try {
       final res = await http.get(
-        _url("/doctor/appointments"),
+        _url("/api/doctor/appointments"),
         headers: _jsonHeaders(withAuth: true),
       );
 
@@ -359,7 +362,7 @@ class ApiService {
 
     try {
       final res = await http.put(
-        _url("/appointments/$intId/status"),
+        _url("/api/appointments/$intId/status"),
         headers: _jsonHeaders(withAuth: true),
         body: jsonEncode({"status": _normalizeStatus(status)}),
       );
@@ -374,27 +377,6 @@ class ApiService {
     }
   }
 
-  /// ❌ إلغاء موعد (إذا endpoint موجود)
-  static Future<bool> cancelAppointment(dynamic id) async {
-    await loadToken();
-    if (token == null) return false;
-
-    final int? intId = int.tryParse(id.toString());
-    if (intId == null) return false;
-
-    try {
-      final res = await http.post(
-        _url("/appointments/$intId/cancel"),
-        headers: _jsonHeaders(withAuth: true),
-      );
-      return res.statusCode == 200 || res.statusCode == 201;
-    } catch (e) {
-      // ignore: avoid_print
-      print("cancelAppointment error: $e");
-      return false;
-    }
-  }
-
   // ================== Admin APIs ====================
 
   static Future<List<dynamic>> getAdminAppointments() async {
@@ -403,7 +385,7 @@ class ApiService {
 
     try {
       final res = await http.get(
-        _url("/admin/appointments"),
+        _url("/api/admin/appointments"),
         headers: _jsonHeaders(withAuth: true),
       );
 
@@ -428,7 +410,7 @@ class ApiService {
 
     try {
       final res = await http.get(
-        _url("/admin/users"),
+        _url("/api/admin/users"),
         headers: _jsonHeaders(withAuth: true),
       );
 
@@ -449,7 +431,7 @@ class ApiService {
 
   static Future<List<dynamic>> getAllDoctors() async {
     try {
-      final res = await http.get(_url("/doctors"), headers: _jsonHeaders());
+      final res = await http.get(_url("/api/doctors"), headers: _jsonHeaders());
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
         if (data is List) return data;
@@ -464,13 +446,14 @@ class ApiService {
     return [];
   }
 
+  /// ⚠️ endpoint /api/admin/patients غير ظاهر في Swagger عندك
   static Future<List<dynamic>> getAllPatients() async {
     await loadToken();
     if (token == null) return [];
 
     try {
       final res = await http.get(
-        _url("/admin/patients"),
+        _url("/api/admin/patients"),
         headers: _jsonHeaders(withAuth: true),
       );
 
@@ -488,30 +471,6 @@ class ApiService {
     return [];
   }
 
-  static Future<List<dynamic>> getAllAppointments() async {
-    await loadToken();
-    if (token == null) return [];
-
-    try {
-      final res = await http.get(
-        _url("/admin/appointments"),
-        headers: _jsonHeaders(withAuth: true),
-      );
-
-      if (res.statusCode == 200) {
-        final data = _tryDecode(res.body);
-        if (data is List) return data;
-        if (data is Map && data['items'] is List) {
-          return List<dynamic>.from(data['items']);
-        }
-      }
-    } catch (e) {
-      // ignore: avoid_print
-      print("getAllAppointments error: $e");
-    }
-    return [];
-  }
-
   static Future<Map<String, dynamic>> getAdminStats() async {
     await loadToken();
     if (token == null) {
@@ -525,10 +484,9 @@ class ApiService {
       };
     }
 
-    // 1) إذا endpoint موجود
     try {
       final res = await http.get(
-        _url("/admin/stats"),
+        _url("/api/admin/stats"),
         headers: _jsonHeaders(withAuth: true),
       );
 
@@ -538,9 +496,9 @@ class ApiService {
       }
     } catch (_) {}
 
-    // 2) fallback
+    // fallback
     try {
-      final apps = await getAllAppointments();
+      final apps = await getAdminAppointments();
       int confirmed = 0, rejected = 0, pending = 0;
       for (final a in apps) {
         final s = (a['status'] ?? '').toString().toLowerCase();
@@ -578,7 +536,8 @@ class ApiService {
 
   // ================= Medical Records =================
 
-  static Future<Map<String, dynamic>?> createMedicalRecord({
+  /// ✅ إنشاء سجل طبي (Doctor only)
+  static Future<bool> createMedicalRecord({
     required int patientId,
     required String diagnosis,
     required String notes,
@@ -587,11 +546,11 @@ class ApiService {
     String? sideEffects,
   }) async {
     await loadToken();
-    if (token == null) return null;
+    if (token == null) return false;
 
     try {
       final res = await http.post(
-        _url("/medical-records"),
+        _url("/api/medical-records"),
         headers: _jsonHeaders(withAuth: true),
         body: jsonEncode({
           "patientId": patientId,
@@ -603,27 +562,32 @@ class ApiService {
         }),
       );
 
-      if (res.statusCode == 200 || res.statusCode == 201) {
-        final data = _tryDecode(res.body);
-        if (data is Map) return Map<String, dynamic>.from(data);
-      }
-      return null;
+      // ignore: avoid_print
+      print("📝 createMedicalRecord status: ${res.statusCode}");
+      // ignore: avoid_print
+      print("📝 createMedicalRecord body: ${res.body}");
+
+      return res.statusCode == 200 || res.statusCode == 201;
     } catch (e) {
       // ignore: avoid_print
       print("createMedicalRecord error: $e");
-      return null;
+      return false;
     }
   }
 
-  static Future<List<dynamic>> getPatientMedicalRecords(int patientId) async {
+  /// ✅ سجلات مريض محدد (Doctor)
+  static Future<List<dynamic>> getMedicalRecordsForPatient(int patientId) async {
     await loadToken();
     if (token == null) return [];
 
     try {
       final res = await http.get(
-        _url("/medical-records/patient/$patientId"),
+        _url("/api/medical-records/patient/$patientId"),
         headers: _jsonHeaders(withAuth: true),
       );
+
+      // ignore: avoid_print
+      print("📚 getMedicalRecordsForPatient status: ${res.statusCode}");
 
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
@@ -632,20 +596,24 @@ class ApiService {
       return [];
     } catch (e) {
       // ignore: avoid_print
-      print("getPatientMedicalRecords error: $e");
+      print("getMedicalRecordsForPatient error: $e");
       return [];
     }
   }
 
+  /// ✅ سجلاتي أنا (Patient)
   static Future<List<dynamic>> getMyMedicalRecords() async {
     await loadToken();
     if (token == null) return [];
 
     try {
       final res = await http.get(
-        _url("/medical-records/mine"),
+        _url("/api/medical-records/mine"),
         headers: _jsonHeaders(withAuth: true),
       );
+
+      // ignore: avoid_print
+      print("📚 getMyMedicalRecords status: ${res.statusCode}");
 
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
@@ -659,103 +627,163 @@ class ApiService {
     }
   }
 
-  // ================= Notifications =================
+  // ================= Doctor Patients Helper =================
 
-/// 🔔 إشعارات المستخدم الحالي
-static Future<List<dynamic>> getMyNotifications() async {
-  await loadToken();
-  if (token == null) return [];
+  /// ✅ (حل عملي) استخرج قائمة مرضى فريدين من مواعيد الطبيب
+  /// يريحك من أي endpoint إضافي
+  static Future<List<Map<String, dynamic>>> getPatientsFromDoctorAppointments() async {
+    final apps = await getDoctorAppointments();
+    final Map<int, Map<String, dynamic>> unique = {};
 
-  try {
-    final res = await http.get(
-      _url("/notifications/mine"),
-      headers: _jsonHeaders(withAuth: true),
-    );
+    for (final a in apps) {
+      if (a is! Map) continue;
+      final patient = a['patient'];
+      if (patient is Map) {
+        final id = int.tryParse(patient['id']?.toString() ?? '');
+        if (id == null) continue;
 
-    if (res.statusCode == 200) {
-      final data = _tryDecode(res.body);
-      if (data is List) return data;
-      if (data is Map && data['items'] is List) return List<dynamic>.from(data['items']);
-    }
-    return [];
-  } catch (e) {
-    // ignore: avoid_print
-    print("getMyNotifications error: $e");
-    return [];
-  }
-}
+        unique[id] = {
+          "id": id,
+          "fullName": patient['fullName']?.toString() ?? "Patient",
+          "phoneNumber": patient['phoneNumber']?.toString(),
+        };
+      } else {
+        // fallback إذا الباك رجع patientName فقط
+        final pid = int.tryParse(a['patientId']?.toString() ?? '');
+        if (pid == null) continue;
 
-/// 🔢 عدد الإشعارات غير المقروءة (من Endpoint الحقيقي عندك)
-static Future<int> getUnreadCount() async {
-  await loadToken();
-  if (token == null) return 0;
-
-  try {
-    final res = await http.get(
-      _url("/notifications/unread-count"),
-      headers: _jsonHeaders(withAuth: true),
-    );
-
-    if (res.statusCode == 200) {
-      final data = _tryDecode(res.body);
-
-      // حالات محتملة للـ response:
-      // 1) رقم مباشر: 5
-      if (data is int) return data;
-
-      // 2) string رقم: "5"
-      if (data is String) return int.tryParse(data) ?? 0;
-
-      // 3) object: { "count": 5 }
-      if (data is Map && data['count'] != null) {
-        return int.tryParse(data['count'].toString()) ?? 0;
+        unique[pid] = {
+          "id": pid,
+          "fullName": a['patientName']?.toString() ?? "Patient",
+        };
       }
     }
 
-    return 0;
-  } catch (e) {
-    // ignore: avoid_print
-    print("getUnreadCount error: $e");
-    return 0;
+    return unique.values.toList();
   }
-}
 
-/// ✅ تعليم إشعار كمقروء
-static Future<bool> markNotificationRead(int id) async {
-  await loadToken();
-  if (token == null) return false;
+  /// ✅ إذا عندك Endpoint جاهز للمرضى (اختياري) بنعمل له fallback
+  /// (إن لم يوجد يرجع []
+  static Future<List<dynamic>> getDoctorPatients() async {
+    await loadToken();
+    if (token == null) return [];
 
-  try {
-    final res = await http.put(
-      _url("/notifications/$id/read"),
-      headers: _jsonHeaders(withAuth: true),
-    );
+    try {
+      final res = await _getWithFallback(
+        const [
+          "/api/doctor/patients",
+          "/api/doctor/patients-screen",
+          "/api/doctor/patients/list",
+        ],
+        withAuth: true,
+      );
 
-    return res.statusCode == 200 || res.statusCode == 204;
-  } catch (e) {
-    // ignore: avoid_print
-    print("markNotificationRead error: $e");
-    return false;
+      if (res.statusCode == 200) {
+        final data = _tryDecode(res.body);
+        if (data is List) return data;
+        if (data is Map && data['items'] is List) return List<dynamic>.from(data['items']);
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print("getDoctorPatients error: $e");
+    }
+    return [];
   }
-}
 
-/// ✅ تعليم كل الإشعارات كمقروءة
-static Future<bool> markAllNotificationsRead() async {
-  await loadToken();
-  if (token == null) return false;
+  // ================= Notifications =================
 
-  try {
-    final res = await http.put(
-      _url("/notifications/read-all"),
-      headers: _jsonHeaders(withAuth: true),
-    );
+  /// 🔔 إشعارات المستخدم الحالي
+  static Future<List<dynamic>> getMyNotifications() async {
+    await loadToken();
+    if (token == null) return [];
 
-    return res.statusCode == 200 || res.statusCode == 204;
-  } catch (e) {
-    // ignore: avoid_print
-    print("markAllNotificationsRead error: $e");
-    return false;
+    try {
+      final res = await http.get(
+        _url("/api/notifications/mine"),
+        headers: _jsonHeaders(withAuth: true),
+      );
+
+      if (res.statusCode == 200) {
+        final data = _tryDecode(res.body);
+        if (data is List) return data;
+        if (data is Map && data['items'] is List) {
+          return List<dynamic>.from(data['items']);
+        }
+      }
+      return [];
+    } catch (e) {
+      // ignore: avoid_print
+      print("getMyNotifications error: $e");
+      return [];
+    }
   }
-}
 
+  /// 🔢 عدد الإشعارات غير المقروءة
+  /// الباك اند عندك يرجّع: { "unread": 5 }
+  static Future<int> getUnreadCount() async {
+    await loadToken();
+    if (token == null) return 0;
+
+    try {
+      final res = await http.get(
+        _url("/api/notifications/unread-count"),
+        headers: _jsonHeaders(withAuth: true),
+      );
+
+      if (res.statusCode == 200) {
+        final data = _tryDecode(res.body);
+
+        if (data is int) return data;
+        if (data is String) return int.tryParse(data) ?? 0;
+
+        if (data is Map) {
+          if (data['unread'] != null) return int.tryParse(data['unread'].toString()) ?? 0;
+          if (data['count'] != null) return int.tryParse(data['count'].toString()) ?? 0;
+        }
+      }
+      return 0;
+    } catch (e) {
+      // ignore: avoid_print
+      print("getUnreadCount error: $e");
+      return 0;
+    }
+  }
+
+  /// ✅ تعليم إشعار كمقروء
+  static Future<bool> markNotificationRead(int id) async {
+    await loadToken();
+    if (token == null) return false;
+
+    try {
+      final res = await http.put(
+        _url("/api/notifications/$id/read"),
+        headers: _jsonHeaders(withAuth: true),
+      );
+
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (e) {
+      // ignore: avoid_print
+      print("markNotificationRead error: $e");
+      return false;
+    }
+  }
+
+  /// ✅ تعليم كل الإشعارات كمقروءة
+  static Future<bool> markAllNotificationsRead() async {
+    await loadToken();
+    if (token == null) return false;
+
+    try {
+      final res = await http.put(
+        _url("/api/notifications/read-all"),
+        headers: _jsonHeaders(withAuth: true),
+      );
+
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (e) {
+      // ignore: avoid_print
+      print("markAllNotificationsRead error: $e");
+      return false;
+    }
+  }
 }

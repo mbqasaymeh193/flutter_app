@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../services/api_service.dart';
 
+// ✅ جديد: شاشة عرض سجلات مريض للطبيب
+import 'patient_medical_records_for_doctor_screen.dart';
+
 class DoctorAppointmentsScreen extends StatefulWidget {
   const DoctorAppointmentsScreen({super.key});
 
@@ -82,6 +85,31 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
     }
   }
 
+  // ✅ جديد: افتح سجلات المريض من نفس بيانات الموعد
+  Future<void> _openMedicalRecords(dynamic appointment) async {
+    final patient = appointment['patient'];
+    final patientId = patient?['id'];
+    final patientName =
+        patient?['fullName'] ?? appointment['patientName'] ?? 'Patient';
+
+    if (patientId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لا يمكن فتح السجلات: PatientId غير موجود')),
+      );
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PatientMedicalRecordsForDoctorScreen(
+          patientId: patientId as int,
+          patientName: patientName.toString(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -116,13 +144,11 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                         itemBuilder: (context, index) {
                           final appointment = appointments[index];
 
-                          // 👤 اسم المريض من الـ backend الجديد
                           final patientName =
                               appointment['patient']?['fullName'] ??
                                   appointment['patientName'] ??
                                   'Patient';
 
-                          // ⏰ الوقت
                           final startsAtStr =
                               appointment['startsAt']?.toString() ?? '';
                           DateTime? startsAt;
@@ -150,10 +176,21 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                               ),
                               title: Text('المريض: $patientName'),
                               subtitle: Text('الوقت: $timeText'),
+                              isThreeLine: true,
+
+                              // ✅ زر “السجل الطبي” + أزرار الحالة
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  // حالة الموعد الحالية
+                                  // زر السجل الطبي
+                                  IconButton(
+                                    tooltip: 'السجل الطبي',
+                                    icon: const Icon(Icons.description_outlined,
+                                        color: Color(0xFF1976D2)),
+                                    onPressed: () => _openMedicalRecords(appointment),
+                                  ),
+
+                                  // حالة الموعد
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 8,
@@ -161,8 +198,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                                     ),
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
-                                      color:
-                                          _statusColor(status).withOpacity(0.15),
+                                      color: _statusColor(status).withOpacity(0.15),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
@@ -174,22 +210,22 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                                       ),
                                     ),
                                   ),
+
                                   IconButton(
                                     icon: const Icon(
                                       Icons.check,
                                       color: Colors.green,
                                     ),
-                                    // نرسل "confirmed" للـ API (سيُطبَّع في ApiService)
-                                    onPressed: () =>
-                                        _updateStatus(appointment['id'], 'confirmed'),
+                                    onPressed: () => _updateStatus(
+                                        appointment['id'], 'confirmed'),
                                   ),
                                   IconButton(
                                     icon: const Icon(
                                       Icons.close,
                                       color: Colors.red,
                                     ),
-                                    onPressed: () =>
-                                        _updateStatus(appointment['id'], 'rejected'),
+                                    onPressed: () => _updateStatus(
+                                        appointment['id'], 'rejected'),
                                   ),
                                 ],
                               ),

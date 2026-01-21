@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 // Doctor
 import 'package:healthcare_flutter_app/screens/doctor/doctor_home_shell.dart';
 import 'package:healthcare_flutter_app/screens/doctor/doctor_patients_screen.dart';
+import 'package:healthcare_flutter_app/screens/doctor/doctor_patient_details_screen.dart';
 
 // Auth
 import 'package:healthcare_flutter_app/screens/auth/login_screen.dart';
@@ -40,7 +41,7 @@ class AppRoutes {
   // ===================== Patient ====================
   static const String patientHomeShell = '/patientHomeShell';
   static const String patientAppointments = '/patientAppointments';
-
+ // static const String patientProfile = '/';
   // ===================== Doctor =====================
   // Doctor shell with tabs
   static const String doctorHomeShell = '/doctorHomeShell';
@@ -49,6 +50,7 @@ class AppRoutes {
   static const String doctorPatients = '/doctorPatients';
   static const String doctorProfile = '/doctorProfile';
   static const String doctorSettings = '/doctorSettings';
+  static const String doctorReports = '/doctor_patient_details_screen';
 
   // (اختياري) شاشة قائمة المرضى لوحدها
   static const String doctorPatientsScreen = '/doctorPatientsScreen';
