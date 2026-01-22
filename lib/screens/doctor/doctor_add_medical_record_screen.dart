@@ -5,13 +5,18 @@ class DoctorAddMedicalRecordScreen extends StatefulWidget {
   final int patientId;
   final String patientName;
 
-  // ✅ edit mode (اختياري)
+  // ✅ إذا موجود => تعديل، إذا null => إنشاء
   final int? recordId;
+
+  // ✅ قيم ابتدائية عند التعديل
   final String? initialDiagnosis;
   final String? initialNotes;
   final String? initialMedication;
   final String? initialAllergies;
   final String? initialSideEffects;
+
+  // (اختياري)
+  final int? appointmentId;
 
   const DoctorAddMedicalRecordScreen({
     super.key,
@@ -23,13 +28,16 @@ class DoctorAddMedicalRecordScreen extends StatefulWidget {
     this.initialMedication,
     this.initialAllergies,
     this.initialSideEffects,
+    this.appointmentId,
   });
 
   @override
-  State<DoctorAddMedicalRecordScreen> createState() => _DoctorAddMedicalRecordScreenState();
+  State<DoctorAddMedicalRecordScreen> createState() =>
+      _DoctorAddMedicalRecordScreenState();
 }
 
-class _DoctorAddMedicalRecordScreenState extends State<DoctorAddMedicalRecordScreen> {
+class _DoctorAddMedicalRecordScreenState
+    extends State<DoctorAddMedicalRecordScreen> {
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _diagnosis;
@@ -62,9 +70,9 @@ class _DoctorAddMedicalRecordScreenState extends State<DoctorAddMedicalRecordScr
     super.dispose();
   }
 
-  String? _req(String? v, String msg) {
-    if (v == null || v.trim().isEmpty) return msg;
-    return null;
+  String? _emptyToNull(String s) {
+    final t = s.trim();
+    return t.isEmpty ? null : t;
   }
 
   Future<void> _submit() async {
@@ -72,14 +80,15 @@ class _DoctorAddMedicalRecordScreenState extends State<DoctorAddMedicalRecordScr
 
     setState(() => _loading = true);
 
-    final diagnosis = _diagnosis.text.trim();
-    final notes = _notes.text.trim();
-    final medication = _medication.text.trim().isEmpty ? null : _medication.text.trim();
-    final allergies = _allergies.text.trim().isEmpty ? null : _allergies.text.trim();
-    final sideEffects = _sideEffects.text.trim().isEmpty ? null : _sideEffects.text.trim();
-
     try {
-      final bool ok;
+      final diagnosis = _diagnosis.text.trim();
+      final notes = _notes.text.trim();
+
+      final medication = _emptyToNull(_medication.text);
+      final allergies = _emptyToNull(_allergies.text);
+      final sideEffects = _emptyToNull(_sideEffects.text);
+
+      bool ok;
 
       if (_isEdit) {
         ok = await ApiService.updateMedicalRecord(
@@ -105,18 +114,26 @@ class _DoctorAddMedicalRecordScreenState extends State<DoctorAddMedicalRecordScr
 
       if (ok) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_isEdit ? 'تم تعديل السجل ✅' : 'تم حفظ السجل الطبي ✅')),
+          SnackBar(
+            content: Text(_isEdit
+                ? 'تم تحديث السجل الطبي ✅'
+                : 'تم حفظ السجل الطبي ✅'),
+          ),
         );
         Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_isEdit ? 'فشل تعديل السجل ❌' : 'فشل حفظ السجل ❌')),
+          SnackBar(
+            content: Text(_isEdit
+                ? 'فشل تحديث السجل الطبي ❌'
+                : 'فشل حفظ السجل الطبي ❌'),
+          ),
         );
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('حدث خطأ أثناء العملية')),
+        const SnackBar(content: Text('حدث خطأ أثناء حفظ السجل')),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -134,8 +151,16 @@ class _DoctorAddMedicalRecordScreenState extends State<DoctorAddMedicalRecordScr
 
   @override
   Widget build(BuildContext context) {
+    final subtitle = _isEdit
+        ? 'تعديل سجل موجود'
+        : (widget.appointmentId == null
+            ? 'سيتم إنشاء سجل للمريض المختار'
+            : 'موعد رقم #${widget.appointmentId}');
+
     return Scaffold(
-      appBar: AppBar(title: Text(_isEdit ? 'تعديل سجل طبي' : 'إضافة سجل طبي')),
+      appBar: AppBar(
+        title: Text(_isEdit ? 'تعديل سجل طبي' : 'إضافة سجل طبي'),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -144,8 +169,11 @@ class _DoctorAddMedicalRecordScreenState extends State<DoctorAddMedicalRecordScr
               Card(
                 child: ListTile(
                   leading: const CircleAvatar(child: Icon(Icons.person)),
-                  title: Text(widget.patientName, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: Text(_isEdit ? 'تعديل السجل رقم #${widget.recordId}' : 'إنشاء سجل جديد للمريض'),
+                  title: Text(
+                    widget.patientName,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(subtitle),
                 ),
               ),
               const SizedBox(height: 10),
@@ -157,7 +185,9 @@ class _DoctorAddMedicalRecordScreenState extends State<DoctorAddMedicalRecordScr
                       TextFormField(
                         controller: _diagnosis,
                         decoration: _dec('Diagnosis', hint: 'مثال: Flu, Allergy...'),
-                        validator: (v) => _req(v, 'Diagnosis مطلوب'),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Diagnosis مطلوب'
+                            : null,
                       ),
                       const SizedBox(height: 10),
                       TextFormField(
@@ -165,7 +195,9 @@ class _DoctorAddMedicalRecordScreenState extends State<DoctorAddMedicalRecordScr
                         decoration: _dec('Notes', hint: 'ملاحظات الطبيب'),
                         minLines: 3,
                         maxLines: 6,
-                        validator: (v) => _req(v, 'Notes مطلوبة'),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Notes مطلوبة'
+                            : null,
                       ),
                       const SizedBox(height: 10),
                       TextFormField(
@@ -190,10 +222,15 @@ class _DoctorAddMedicalRecordScreenState extends State<DoctorAddMedicalRecordScr
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
                                 )
-                              : const Icon(Icons.save),
-                          label: Text(_loading ? 'Saving...' : (_isEdit ? 'Update Medical Record' : 'Save Medical Record')),
+                              : Icon(_isEdit ? Icons.check : Icons.save),
+                          label: Text(_loading
+                              ? 'Saving...'
+                              : (_isEdit ? 'Update Medical Record' : 'Save Medical Record')),
                           onPressed: _loading ? null : _submit,
                         ),
                       ),

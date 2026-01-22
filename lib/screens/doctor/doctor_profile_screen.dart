@@ -1,46 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/api_service.dart';
 
-class DoctorProfileScreen extends StatefulWidget {
+class DoctorProfileScreen extends StatelessWidget {
   const DoctorProfileScreen({super.key});
 
   @override
-  State<DoctorProfileScreen> createState() => _DoctorProfileScreenState();
-}
-
-class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
-  String name = '';
-  String email = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadProfile();
-  }
-
-  Future<void> _loadProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      name = prefs.getString('name') ?? '';
-      email = prefs.getString('email') ?? '';
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.person),
-              title: Text(name),
-              subtitle: Text(email),
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          const Card(
+            child: ListTile(
+              leading: CircleAvatar(child: Icon(Icons.person)),
+              title: Text('حساب الطبيب', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: Text('تعديل البيانات من السيرفر عبر /api/doctor/profile'),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                await ApiService.logout();
+                if (context.mounted) {
+                  Navigator.popUntil(context, (r) => r.isFirst);
+                }
+              },
+              icon: const Icon(Icons.logout),
+              label: const Text('تسجيل الخروج'),
+            ),
+          ),
+        ],
       ),
     );
   }

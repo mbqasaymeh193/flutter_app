@@ -26,8 +26,7 @@ class HospitalApp extends StatelessWidget {
           centerTitle: true,
         ),
       ),
-      // ✅ بدل ما نبدأ بـ login مباشرة: نبدأ ببوابة تتحقق من التوكن والدور
-      initialRoute: '/login_screen',
+      initialRoute: AppRoutes.gate,
       onGenerateRoute: AppRoutes.generateRoute,
     );
   }

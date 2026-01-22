@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:healthcare_flutter_app/services/api_service.dart';
 import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
-import 'doctor_patient_details_screen.dart';
+
+// ✅ شاشة السجلات للطبيب (تعرض سجلات المريض + زر إنشاء أول سجل + تعديل)
+import 'package:healthcare_flutter_app/screens/doctor/patient_medical_records_for_doctor_screen.dart';
+
+// ✅ شاشة إضافة/تعديل سجل طبي
+import 'package:healthcare_flutter_app/screens/doctor/doctor_add_medical_record_screen.dart';
 
 class DoctorHomeShell extends StatefulWidget {
-  final int initialTab; // ✅ تبويب البداية (0..4)
+  // ✅ 4 Tabs فقط (0..3)
+  final int initialTab;
 
   const DoctorHomeShell({super.key, this.initialTab = 0});
 
@@ -13,24 +19,28 @@ class DoctorHomeShell extends StatefulWidget {
   State<DoctorHomeShell> createState() => _DoctorHomeShellState();
 }
 
-class _DoctorHomeShellState extends State<DoctorHomeShell>
-    with TickerProviderStateMixin {
+class _DoctorHomeShellState extends State<DoctorHomeShell> {
   late int _currentIndex;
   late final PageController _pageController;
 
   bool _loadingAppointments = true;
   List<dynamic> _appointments = [];
 
-  // ✅ مفتاح للوصول إلى حالة تبويب المرضى (لزر التحديث في AppBar)
-  final GlobalKey<_PatientsTabState> _patientsTabKey = GlobalKey<_PatientsTabState>();
+  // ✅ مفتاح لتحديث تبويب السجلات من AppBar
+  final GlobalKey<_RecordsTabState> _recordsTabKey = GlobalKey<_RecordsTabState>();
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialTab.clamp(0, 4);
-    _pageController =
-        PageController(keepPage: true, initialPage: _currentIndex);
+    _currentIndex = _clampTab(widget.initialTab);
+    _pageController = PageController(keepPage: true, initialPage: _currentIndex);
     _loadAppointments();
+  }
+
+  static int _clampTab(int tab) {
+    if (tab < 0) return 0;
+    if (tab > 3) return 3;
+    return tab;
   }
 
   // 🩺 تحميل مواعيد الطبيب
@@ -38,11 +48,11 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
     setState(() => _loadingAppointments = true);
     try {
       final data = await ApiService.getDoctorAppointments();
-      final list = (data ?? []);
-      print("📅 DoctorHomeShell: loaded ${list.length} appointments");
-      setState(() => _appointments = list);
+      if (!mounted) return;
+      setState(() => _appointments = (data ?? []));
     } catch (e) {
       debugPrint("DoctorHomeShell _loadAppointments error: $e");
+      if (!mounted) return;
       setState(() => _appointments = []);
     } finally {
       if (mounted) setState(() => _loadingAppointments = false);
@@ -50,9 +60,10 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
   }
 
   void _onTab(int i) {
-    setState(() => _currentIndex = i);
+    final idx = _clampTab(i);
+    setState(() => _currentIndex = idx);
     _pageController.animateToPage(
-      i,
+      idx,
       duration: const Duration(milliseconds: 260),
       curve: Curves.easeInOut,
     );
@@ -65,21 +76,18 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
       case 1:
         return 'مواعيدي';
       case 2:
-        return 'مرضاي';
+        return 'السجلات الطبية';
       case 3:
-        return 'الملف الشخصي';
-      case 4:
       default:
-        return 'الإعدادات';
+        return 'حسابي';
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // ✅ تجهيز أزرار الـ AppBar حسب التبويب
+    // ✅ أزرار AppBar حسب التبويب
     List<Widget>? appBarActions;
     if (_currentIndex == 1) {
-      // تبويب المواعيد
       appBarActions = [
         IconButton(
           tooltip: 'تحديث المواعيد',
@@ -88,11 +96,10 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
         ),
       ];
     } else if (_currentIndex == 2) {
-      // تبويب المرضى
       appBarActions = [
         IconButton(
-          tooltip: 'تحديث المرضى',
-          onPressed: () => _patientsTabKey.currentState?._loadPatients(),
+          tooltip: 'تحديث قائمة المرضى',
+          onPressed: () => _recordsTabKey.currentState?._loadPatients(),
           icon: const Icon(Icons.refresh),
         ),
       ];
@@ -116,9 +123,8 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
             appointments: _appointments,
             onRefresh: _loadAppointments,
           ),
-          _PatientsTab(key: _patientsTabKey),
+          _RecordsTab(key: _recordsTabKey),
           const _ProfileTab(),
-          const _SettingsTab(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -137,24 +143,14 @@ class _DoctorHomeShellState extends State<DoctorHomeShell>
             label: 'المواعيد',
           ),
           NavigationDestination(
-            icon: Icon(Icons.people_alt_outlined),
-            selectedIcon: Icon(Icons.people_alt),
-            label: 'المرضى',
+            icon: Icon(Icons.folder_shared_outlined),
+            selectedIcon: Icon(Icons.folder_shared),
+            label: 'السجلات',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
-            label: 'الملف الشخصي',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month),
-            label: 'السجل الطبي',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'الإعدادات',
+            label: 'حسابي',
           ),
         ],
       ),
@@ -174,7 +170,8 @@ class _DashboardTab extends StatelessWidget {
         Card(
           elevation: 3,
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(16))),
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+          ),
           child: ListTile(
             leading: Icon(Icons.medical_services, color: Color(0xFF1976D2)),
             title: Text('مرحباً بك دكتور 👋'),
@@ -221,11 +218,14 @@ class _AppointmentsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (loading) {
       return const Center(
-          child: CircularProgressIndicator(color: Color(0xFF1976D2)));
+        child: CircularProgressIndicator(color: Color(0xFF1976D2)),
+      );
     }
+
     if (appointments.isEmpty) {
       return const Center(child: Text('لا توجد مواعيد حالياً'));
     }
+
     return RefreshIndicator(
       color: const Color(0xFF1976D2),
       onRefresh: onRefresh,
@@ -234,29 +234,27 @@ class _AppointmentsTab extends StatelessWidget {
         itemCount: appointments.length,
         itemBuilder: (_, i) {
           final a = appointments[i];
+
           final patientName =
               a['patient']?['fullName'] ?? a['patientName'] ?? 'Patient';
+
           final startsAtStr = a['startsAt']?.toString() ?? '';
-          DateTime? startsAt;
-          try {
-            startsAt = DateTime.tryParse(startsAtStr);
-          } catch (_) {}
+          final startsAt = DateTime.tryParse(startsAtStr);
           final dateText = startsAt == null
               ? startsAtStr
-              : DateFormat('y/MM/dd • HH:mm').format(startsAt);
+              : DateFormat('y/MM/dd • HH:mm').format(startsAt.toLocal());
+
           final status = (a['status'] ?? 'Pending').toString();
 
           return Card(
             elevation: 3,
             margin: const EdgeInsets.only(bottom: 12),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             child: ListTile(
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              leading: CircleAvatar(
-                backgroundColor: const Color(0x221976D2),
-                child: const Icon(Icons.person, color: Color(0xFF1976D2)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              leading: const CircleAvatar(
+                backgroundColor: Color(0x221976D2),
+                child: Icon(Icons.person, color: Color(0xFF1976D2)),
               ),
               title: Text(
                 patientName,
@@ -267,29 +265,25 @@ class _AppointmentsTab extends StatelessWidget {
                 maxLines: 2,
               ),
               trailing: PopupMenuButton<String>(
-                icon: Icon(
-                  Icons.more_vert,
-                  color: _statusColor(status),
-                ),
+                icon: Icon(Icons.more_vert, color: _statusColor(status)),
                 onSelected: (value) async {
-                  final ok = await ApiService.updateAppointmentStatus(
-                    a['id'],
-                    value,
-                  );
+                  final ok = await ApiService.updateAppointmentStatus(a['id'], value);
+                  if (!context.mounted) return;
+
                   if (ok) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(
-                        value == 'confirmed'
-                            ? 'تم تأكيد الموعد ✅'
-                            : 'تم رفض الموعد ❌',
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          value == 'confirmed'
+                              ? 'تم تأكيد الموعد ✅'
+                              : 'تم رفض الموعد ❌',
+                        ),
                       ),
-                    ));
+                    );
                     onRefresh();
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('فشل في تحديث حالة الموعد'),
-                      ),
+                      const SnackBar(content: Text('فشل في تحديث حالة الموعد')),
                     );
                   }
                 },
@@ -306,17 +300,24 @@ class _AppointmentsTab extends StatelessWidget {
   }
 }
 
-/// 🔹 تبويب المرضى
-class _PatientsTab extends StatefulWidget {
-  const _PatientsTab({super.key});
+/// ✅ تبويب السجلات الطبية للطبيب
+/// قائمة مرضى (مستخرجة من مواعيد الطبيب) + زر "السجل" ذكي:
+/// - إذا لا يوجد سجلات → يفتح إنشاء سجل مباشرة
+/// - إذا يوجد سجلات → يفتح شاشة السجلات
+class _RecordsTab extends StatefulWidget {
+  const _RecordsTab({super.key});
 
   @override
-  State<_PatientsTab> createState() => _PatientsTabState();
+  State<_RecordsTab> createState() => _RecordsTabState();
 }
 
-class _PatientsTabState extends State<_PatientsTab> {
+class _RecordsTabState extends State<_RecordsTab> {
   bool _loading = true;
-  List<dynamic> _patients = [];
+  List<Map<String, dynamic>> _patients = [];
+  String? _error;
+
+  // ✅ Loading لكل مريض بشكل مستقل
+  final Set<int> _openingPatientIds = {};
 
   @override
   void initState() {
@@ -324,58 +325,88 @@ class _PatientsTabState extends State<_PatientsTab> {
     _loadPatients();
   }
 
-  // ⚠ استدعيناها من الـ AppBar في DoctorHomeShell عبر GlobalKey
+  // ⚠ استدعيناها من الـ AppBar عبر GlobalKey
   Future<void> _loadPatients() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
     try {
-      final data = await ApiService.getDoctorAppointments();
-      final uniquePatients = <String, Map<String, dynamic>>{};
+      final patients = await ApiService.getPatientsFromDoctorAppointments();
 
-      if (data.isNotEmpty) {
-        for (final a in data) {
-          final p = a['patient'];
-          if (p != null) {
-            final id = p['id'].toString();
-            uniquePatients.putIfAbsent(id, () {
-              return {
-                'id': p['id'],
-                'name': p['fullName'] ?? 'Patient',
-                'lastAppointment': a['startsAt'] ?? '',
-                'status': a['status'] ?? 'Pending',
-              };
-            });
-          }
-        }
-      }
+      patients.sort((a, b) => (a['fullName'] ?? '')
+          .toString()
+          .compareTo((b['fullName'] ?? '').toString()));
 
-      print("👥 PatientsTab: loaded ${uniquePatients.length} patients");
-
-      setState(() => _patients = uniquePatients.values.toList());
+      if (!mounted) return;
+      setState(() {
+        _patients = patients;
+        _loading = false;
+      });
     } catch (e) {
-      debugPrint("loadPatients error: $e");
-      setState(() => _patients = []);
+      debugPrint("_RecordsTab _loadPatients error: $e");
+      if (!mounted) return;
+      setState(() {
+        _patients = [];
+        _loading = false;
+        _error = 'حدث خطأ أثناء تحميل المرضى';
+      });
+    }
+  }
+
+  Future<void> _openMedicalFlow({
+    required int patientId,
+    required String patientName,
+  }) async {
+    if (_openingPatientIds.contains(patientId)) return;
+
+    setState(() => _openingPatientIds.add(patientId));
+
+    try {
+      final records = await ApiService.getMedicalRecordsForPatient(patientId);
+
+      if (!mounted) return;
+
+      if (records.isEmpty) {
+        // ✅ لا يوجد سجل → افتح إنشاء سجل مباشرة
+        final ok = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DoctorAddMedicalRecordScreen(
+              patientId: patientId,
+              patientName: patientName,
+            ),
+          ),
+        );
+
+        // لو حفظ → ممكن تعمل تحديث (اختياري)
+        if (ok == true) {
+          // لا حاجة لإعادة تحميل المرضى عادةً
+        }
+      } else {
+        // ✅ يوجد سجلات → افتح شاشة السجلات
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PatientMedicalRecordsForDoctorScreen(
+              patientId: patientId,
+              patientName: patientName,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("_openMedicalFlow error: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('حدث خطأ أثناء فتح السجل الطبي')),
+      );
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _openingPatientIds.remove(patientId));
+      }
     }
-  }
-
-  Color _statusColor(String s) {
-    switch (s.toLowerCase()) {
-      case 'confirmed':
-      case 'accepted':
-        return Colors.green;
-      case 'rejected':
-        return Colors.red;
-      default:
-        return Colors.orange;
-    }
-  }
-
-  String _statusLabel(String s) {
-    final lower = s.toLowerCase();
-    if (lower == 'confirmed' || lower == 'accepted') return 'مؤكد';
-    if (lower == 'rejected') return 'مرفوض';
-    return 'قيد الانتظار';
   }
 
   @override
@@ -386,10 +417,16 @@ class _PatientsTabState extends State<_PatientsTab> {
       );
     }
 
+    if (_error != null) {
+      return Center(
+        child: Text(_error!, style: const TextStyle(color: Colors.red)),
+      );
+    }
+
     if (_patients.isEmpty) {
       return const Center(
         child: Text(
-          'لم يتم العثور على مرضى بعد 👩‍⚕️',
+          'لا يوجد مرضى مرتبطين بمواعيدك بعد 👨‍⚕️',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
         ),
       );
@@ -403,78 +440,46 @@ class _PatientsTabState extends State<_PatientsTab> {
         itemCount: _patients.length,
         itemBuilder: (_, i) {
           final p = _patients[i];
-          final dateStr = p['lastAppointment'] ?? '';
-          DateTime? date;
-          try {
-            date = DateTime.tryParse(dateStr);
-          } catch (_) {}
-          final formatted = date == null
-              ? dateStr
-              : DateFormat('y/MM/dd • HH:mm').format(date);
+
+          final id = int.tryParse(p['id']?.toString() ?? '') ?? 0;
+          final name = (p['fullName'] ?? 'Patient').toString();
+          final phone = (p['phoneNumber'] ?? '').toString();
+          final isOpening = _openingPatientIds.contains(id);
 
           return Card(
             elevation: 3,
             margin: const EdgeInsets.only(bottom: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             child: ListTile(
-              onTap: () {
-                Navigator.of(context).push(PageRouteBuilder(
-                  transitionDuration: const Duration(milliseconds: 400),
-                  pageBuilder: (context, animation, secondaryAnimation) =>
-                      DoctorPatientDetailsScreen(patient: {
-                    'id': p['id'] ?? '',
-                    'name': p['name'] ?? 'Patient',
-                  }),
-                  transitionsBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                    const begin = Offset(1.0, 0.0);
-                    const end = Offset.zero;
-                    const curve = Curves.easeInOut;
-                    final tween = Tween(begin: begin, end: end)
-                        .chain(CurveTween(curve: curve));
-                    return SlideTransition(
-                      position: animation.drive(tween),
-                      child: child,
-                    );
-                  },
-                ));
-              },
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               leading: const CircleAvatar(
                 backgroundColor: Color(0x221976D2),
                 child: Icon(Icons.person, color: Color(0xFF1976D2)),
               ),
-              title: Text(
-                p['name'],
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Text('آخر موعد: $formatted'),
-              trailing: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: _statusColor(p['status']).withOpacity(.15),
-                  borderRadius: BorderRadius.circular(8),
+              title: Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: phone.isEmpty ? null : Text('رقم الهاتف: $phone'),
+              trailing: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF1976D2),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: Text(
-                  _statusLabel(p['status']),
-                  style: TextStyle(
-                    color: _statusColor(p['status']),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
+                icon: isOpening
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.folder_shared),
+                label: Text(isOpening ? 'فتح...' : 'السجل'),
+                onPressed: isOpening
+                    ? null
+                    : () => _openMedicalFlow(patientId: id, patientName: name),
               ),
-              ListTile(
-  leading: const Icon(Icons.folder_shared_outlined),
-  title: const Text('سجلاتي الطبية'),
-  subtitle: const Text('عرض التشخيصات والأدوية والملاحظات'),
-  onTap: () => Navigator.pushNamed(context, AppRoutes.doctor_patient_details_screen),
-),
-
             ),
           );
         },
@@ -483,7 +488,7 @@ class _PatientsTabState extends State<_PatientsTab> {
   }
 }
 
-/// 🔹 الملف الشخصي
+/// 🔹 حسابي (الملف الشخصي + تغيير كلمة المرور + خروج)
 class _ProfileTab extends StatelessWidget {
   const _ProfileTab();
 
@@ -495,7 +500,8 @@ class _ProfileTab extends StatelessWidget {
         const Card(
           elevation: 3,
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(16))),
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+          ),
           child: ListTile(
             leading: CircleAvatar(child: Icon(Icons.person)),
             title: Text('بيانات الطبيب'),
@@ -506,26 +512,27 @@ class _ProfileTab extends StatelessWidget {
         Card(
           elevation: 0,
           color: Colors.white,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           child: Column(
             children: [
               ListTile(
                 leading: const Icon(Icons.lock_outline),
                 title: const Text('تغيير كلمة المرور'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () =>
-                    Navigator.pushNamed(context, AppRoutes.changePassword),
+                onTap: () => Navigator.pushNamed(context, AppRoutes.changePassword),
               ),
               const Divider(height: 0),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('تسجيل الخروج',
-                    style: TextStyle(color: Colors.red)),
-                trailing:
-                    const Icon(Icons.exit_to_app_rounded, color: Colors.red),
+                title: const Text(
+                  'تسجيل الخروج',
+                  style: TextStyle(color: Colors.red),
+                ),
+                trailing: const Icon(Icons.exit_to_app_rounded, color: Colors.red),
                 onTap: () async {
                   await ApiService.logout();
+                  if (!context.mounted) return;
+
                   Navigator.pushNamedAndRemoveUntil(
                     context,
                     AppRoutes.login,
@@ -537,21 +544,6 @@ class _ProfileTab extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// 🔹 الإعدادات
-class _SettingsTab extends StatelessWidget {
-  const _SettingsTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'إعدادات النظام للطبيب ⚙️',
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-      ),
     );
   }
 }

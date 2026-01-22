@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:healthcare_flutter_app/services/api_service.dart';
 import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
 
@@ -13,10 +12,17 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
   bool _isLoading = false;
   bool _hidePassword = true;
 
-  // ✅ تسجيل الدخول
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   Future<void> _login() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -30,25 +36,27 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    final result = await ApiService.login(email, password);
+    try {
+      final result = await ApiService.login(email, password);
 
-    setState(() => _isLoading = false);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
 
-    if (result != null && result['token'] != null) {
-      // حفظ بيانات المستخدم
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('token', result['token']);
-      await prefs.setString('role', result['role'] ?? '');
-      await prefs.setString('name', result['name'] ?? '');
-      ApiService.token = result['token'];
+      final role = (result?['role'] ?? '').toString().toLowerCase();
+      final token = (result?['token'] ?? '').toString();
 
-      final role = (result['role'] ?? '').toString().toLowerCase();
+      if (token.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('بيانات تسجيل الدخول غير صحيحة ❌')),
+        );
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تم تسجيل الدخول بنجاح ✅')),
       );
 
-      // ✅ التوجيه حسب نوع الحساب
+      // ✅ التوجيه حسب الدور
       if (role == 'doctor') {
         Navigator.pushReplacementNamed(context, AppRoutes.doctorDashboard);
       } else if (role == 'admin') {
@@ -56,9 +64,12 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         Navigator.pushReplacementNamed(context, AppRoutes.patientHomeShell);
       }
-    } else {
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('بيانات تسجيل الدخول غير صحيحة ❌')),
+        const SnackBar(content: Text('حدث خطأ أثناء تسجيل الدخول')),
       );
     }
   }
@@ -74,7 +85,6 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 🏥 شعار طبي أنيق
                 Icon(Icons.local_hospital_rounded,
                     size: 70, color: Colors.blue.shade700),
                 const SizedBox(height: 12),
@@ -88,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 30),
 
-                // 📧 البريد الإلكتروني
+                // 📧 Email
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -102,7 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // 🔑 كلمة المرور
+                // 🔑 Password
                 TextField(
                   controller: _passwordController,
                   obscureText: _hidePassword,
@@ -137,7 +147,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 12),
 
-                // زر تسجيل الدخول
                 _isLoading
                     ? const CircularProgressIndicator(color: Color(0xFF1976D2))
                     : ElevatedButton(
@@ -158,7 +167,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 20),
 
-                // رابط إنشاء حساب جديد
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
