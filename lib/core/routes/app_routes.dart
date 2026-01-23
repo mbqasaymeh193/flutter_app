@@ -6,7 +6,7 @@ import 'package:healthcare_flutter_app/screens/doctor/doctor_patients_screen.dar
 
 // Auth
 import 'package:healthcare_flutter_app/screens/auth/login_screen.dart';
-import 'package:healthcare_flutter_app/screens/auth/register_screen.dart';
+import 'package:healthcare_flutter_app/screens/auth/signup_screen.dart';
 import 'package:healthcare_flutter_app/screens/auth/forgot_password_screen.dart';
 import 'package:healthcare_flutter_app/screens/auth/reset_password_screen.dart';
 import 'package:healthcare_flutter_app/screens/change_password_screen.dart';
@@ -29,8 +29,13 @@ class AppRoutes {
   static const String gate = '/gate';
 
   // ===================== Auth =====================
-  static const String login = '/login_screen';
-  static const String register = '/register';
+static const String login = '/login';
+static const String signup = '/signup';
+
+// alias قديم (اختياري)
+static const String register = '/register';
+
+
   static const String forgotPassword = '/forgot-password';
   static const String resetPassword = '/reset-password';
   static const String changePassword = '/changePassword';
@@ -45,19 +50,23 @@ class AppRoutes {
   static const String patientAppointments = '/patientAppointments';
 
   // ===================== Doctor =====================
-  // 4 Tabs only:
-  // 0: Home, 1: Appointments, 2: Records/Patients, 3: Profile
+  // 0: Dashboard, 1: Appointments, 2: Records, 3: Profile
   static const String doctorHomeShell = '/doctorHomeShell';
   static const String doctorDashboard = '/doctorDashboard';
   static const String doctorAppointments = '/doctorAppointments';
-  static const String doctorRecords = '/doctorRecords'; // بدل doctorPatients كاسم منطقي
+  static const String doctorRecords = '/doctorRecords';
   static const String doctorProfile = '/doctorProfile';
 
-  // (اختياري) شاشة قائمة المرضى لوحدها (بدون BottomTabs)
   static const String doctorPatientsScreen = '/doctorPatientsScreen';
 
   // ===================== Admin ======================
+  // 0: Dashboard, 1: Doctors approvals, 2: Patients, 3: Appointments, 4: Settings
+  static const String adminHomeShell = '/adminHomeShell';
   static const String adminDashboard = '/adminDashboard';
+  static const String adminDoctors = '/adminDoctors';
+  static const String adminPatients = '/adminPatients';
+  static const String adminAppointments = '/adminAppointments';
+  static const String adminSettings = '/adminSettings';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -69,8 +78,12 @@ class AppRoutes {
       case login:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
 
+      case signup:
+        return MaterialPageRoute(builder: (_) => const SignupScreen());
+
       case register:
-        return MaterialPageRoute(builder: (_) => const RegisterScreen());
+        // ✅ alias يرجع لنفس شاشة Signup
+        return MaterialPageRoute(builder: (_) => const SignupScreen());
 
       case forgotPassword:
         return MaterialPageRoute(builder: (_) => const ForgotPasswordScreen());
@@ -81,7 +94,7 @@ class AppRoutes {
       case changePassword:
         return MaterialPageRoute(builder: (_) => const ChangePasswordScreen());
 
-      case registerSuccess:
+      case registerSuccess: {
         final args = settings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
           builder: (_) => RegisterSuccessScreen(
@@ -90,6 +103,7 @@ class AppRoutes {
             autoLoggedIn: args?['autoLoggedIn'] ?? true,
           ),
         );
+      }
 
       // ---------- Notifications ----------
       case notifications:
@@ -106,9 +120,12 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const PatientAppointmentsScreen());
 
       // ---------- Doctor Shell ----------
-      case doctorHomeShell:
+      case doctorHomeShell: {
         final tab = (settings.arguments as int?) ?? 0;
-        return MaterialPageRoute(builder: (_) => DoctorHomeShell(initialTab: _clampDoctorTab(tab)));
+        return MaterialPageRoute(
+          builder: (_) => DoctorHomeShell(initialTab: _clampDoctorTab(tab)),
+        );
+      }
 
       case doctorDashboard:
         return MaterialPageRoute(builder: (_) => const DoctorHomeShell(initialTab: 0));
@@ -125,9 +142,29 @@ class AppRoutes {
       case doctorPatientsScreen:
         return MaterialPageRoute(builder: (_) => const DoctorPatientsScreen());
 
-      // ---------- Admin ----------
+      // ---------- Admin Shell ----------
+      case adminHomeShell: {
+        final tab = (settings.arguments as int?) ?? 0;
+        return MaterialPageRoute(
+          builder: (_) => AdminHomeShell(initialTab: _clampAdminTab(tab)),
+        );
+      }
+
+      // aliases (تفتح نفس الـ shell على تاب محدد)
       case adminDashboard:
-        return MaterialPageRoute(builder: (_) => const AdminHomeShell());
+        return MaterialPageRoute(builder: (_) => const AdminHomeShell(initialTab: 0));
+
+      case adminDoctors:
+        return MaterialPageRoute(builder: (_) => const AdminHomeShell(initialTab: 1));
+
+      case adminPatients:
+        return MaterialPageRoute(builder: (_) => const AdminHomeShell(initialTab: 2));
+
+      case adminAppointments:
+        return MaterialPageRoute(builder: (_) => const AdminHomeShell(initialTab: 3));
+
+      case adminSettings:
+        return MaterialPageRoute(builder: (_) => const AdminHomeShell(initialTab: 4));
 
       // ---------- 404 ----------
       default:
@@ -148,6 +185,12 @@ class AppRoutes {
   static int _clampDoctorTab(int tab) {
     if (tab < 0) return 0;
     if (tab > 3) return 3;
+    return tab;
+  }
+
+  static int _clampAdminTab(int tab) {
+    if (tab < 0) return 0;
+    if (tab > 4) return 4;
     return tab;
   }
 }

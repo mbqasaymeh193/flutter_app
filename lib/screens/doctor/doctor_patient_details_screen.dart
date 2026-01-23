@@ -35,7 +35,6 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this)
       ..addListener(() {
-        // فقط لإعادة بناء الـ FAB عند تغيير التبويب
         setState(() {});
       });
     _loadAppointments();
@@ -76,7 +75,7 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
 
   String _formatDateTime(dynamic value) {
     if (value == null) return '';
-    String raw = value.toString();
+    final raw = value.toString();
     if (raw.isEmpty) return '';
     try {
       final dt = DateTime.tryParse(raw);
@@ -111,20 +110,21 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
   Future<void> _loadAppointments() async {
     setState(() => _loadingAppointments = true);
     try {
-      final allAppointments = await ApiService.getDoctorAppointments() ?? [];
+      final allAppointments = await ApiService.getDoctorAppointments();
       final pid = _patientId?.toString();
 
-      final filtered = allAppointments
+      final filtered = (allAppointments ?? [])
           .where((a) =>
-              a['patient']?['id']?.toString() == pid ||
-              a['patientId']?.toString() == pid)
+              a is Map &&
+              (a['patient']?['id']?.toString() == pid ||
+                  a['patientId']?.toString() == pid))
           .toList();
 
+      if (!mounted) return;
       setState(() => _appointments = filtered);
-      debugPrint(
-          "🩺 DoctorPatientDetails: loaded ${filtered.length} appointments for patient $pid");
     } catch (e) {
       debugPrint("⚠️ loadAppointments error: $e");
+      if (!mounted) return;
       setState(() => _appointments = []);
     } finally {
       if (mounted) setState(() => _loadingAppointments = false);
@@ -134,7 +134,7 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
   Future<void> _loadMedicalRecords() async {
     final pid = _patientId;
     if (pid == null) {
-      debugPrint("⚠️ _loadMedicalRecords: patientId is null");
+      if (!mounted) return;
       setState(() {
         _medicalRecords = [];
         _loadingRecords = false;
@@ -144,12 +144,14 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
 
     setState(() => _loadingRecords = true);
     try {
+      // ✅ FIX 1: الاسم الصحيح الموجود أو (Compatibility) الذي أضفناه
       final list = await ApiService.getPatientMedicalRecords(pid);
+
+      if (!mounted) return;
       setState(() => _medicalRecords = list);
-      debugPrint(
-          "📚 DoctorPatientDetails: loaded ${list.length} medical records for patient $pid");
     } catch (e) {
       debugPrint("⚠️ loadMedicalRecords error: $e");
+      if (!mounted) return;
       setState(() => _medicalRecords = []);
     } finally {
       if (mounted) setState(() => _loadingRecords = false);
@@ -240,8 +242,9 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.notes),
                     ),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'الملاحظات مطلوبة' : null,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'الملاحظات مطلوبة'
+                        : null,
                   ),
                   const SizedBox(height: 10),
                   TextFormField(
@@ -298,7 +301,8 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
                             final allg = _allergiesController.text.trim();
                             final side = _sideEffectsController.text.trim();
 
-                            final result = await ApiService.createMedicalRecord(
+                            // ✅ FIX 2: createMedicalRecord ترجع bool
+                            final ok = await ApiService.createMedicalRecord(
                               patientId: pid,
                               diagnosis: diag,
                               notes: notes,
@@ -307,12 +311,14 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
                               sideEffects: side.isEmpty ? null : side,
                             );
 
-                            if (result != null && context.mounted) {
+                            if (!mounted) return;
+
+                            if (ok) {
                               Navigator.pop(ctx);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                    content:
-                                        Text('تم حفظ التقرير الطبي بنجاح ✅')),
+                                  content: Text('تم حفظ التقرير الطبي بنجاح ✅'),
+                                ),
                               );
                               _loadMedicalRecords();
                             } else {
@@ -356,8 +362,7 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
           padding: const EdgeInsets.all(24),
           children: const [
             SizedBox(height: 60),
-            Icon(Icons.calendar_today_outlined,
-                size: 64, color: Colors.grey),
+            Icon(Icons.calendar_today_outlined, size: 64, color: Colors.grey),
             SizedBox(height: 16),
             Center(
               child: Text(
@@ -377,18 +382,16 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
         padding: const EdgeInsets.all(16),
         itemCount: _appointments.length,
         itemBuilder: (_, i) {
-          final a = _appointments[i];
+          final a = _appointments[i] as Map;
           final dateText = _formatDateTime(a['startsAt']);
           final status = (a['status'] ?? 'Pending').toString();
 
           return Card(
             elevation: 3,
             margin: const EdgeInsets.only(bottom: 12),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Row(
                 children: [
                   Container(
@@ -414,21 +417,14 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Chip(
-                              label: Text(
-                                _statusLabel(status),
-                                style: const TextStyle(
-                                    color: Colors.white, fontSize: 12),
-                              ),
-                              backgroundColor: _statusColor(status),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 6),
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ],
+                        Chip(
+                          label: Text(
+                            _statusLabel(status),
+                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                          backgroundColor: _statusColor(status),
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ],
                     ),
@@ -437,13 +433,13 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
                     icon: const Icon(Icons.more_vert),
                     onSelected: (value) async {
                       bool ok = false;
+
                       if (value == 'cancel') {
                         final confirm = await showDialog<bool>(
                           context: context,
                           builder: (ctx) => AlertDialog(
                             title: const Text('تأكيد الإلغاء'),
-                            content: const Text(
-                                'هل أنت متأكد من حذف هذا الموعد نهائيًا؟'),
+                            content: const Text('هل أنت متأكد من حذف هذا الموعد نهائيًا؟'),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(ctx, false),
@@ -461,47 +457,47 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
                         );
                         if (confirm != true) return;
 
+                        // ✅ FIX 3: cancelAppointment موجود الآن (بعد إضافته في ApiService)
                         ok = await ApiService.cancelAppointment(a['id']);
+
+                        if (!mounted) return;
+
                         if (ok) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('تم إلغاء الموعد نهائيًا ✅')),
+                            const SnackBar(content: Text('تم إلغاء الموعد نهائيًا ✅')),
                           );
                           _loadAppointments();
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('فشل في إلغاء الموعد ❌')),
+                            const SnackBar(content: Text('فشل في إلغاء الموعد ❌')),
                           );
                         }
                       } else {
-                        // تحديث حالة الموعد Confirmed / Rejected
-                        ok = await ApiService.updateAppointmentStatus(
-                            a['id'], value);
+                        ok = await ApiService.updateAppointmentStatus(a['id'], value);
+
+                        if (!mounted) return;
+
                         if (ok) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(value.toLowerCase() ==
-                                      'confirmed'
-                                  ? 'تم تأكيد الموعد ✅'
-                                  : 'تم رفض الموعد ❌'),
+                              content: Text(
+                                value.toLowerCase() == 'confirmed'
+                                    ? 'تم تأكيد الموعد ✅'
+                                    : 'تم رفض الموعد ❌',
+                              ),
                             ),
                           );
                           _loadAppointments();
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content:
-                                    Text('فشل في تحديث حالة الموعد ❌')),
+                            const SnackBar(content: Text('فشل في تحديث حالة الموعد ❌')),
                           );
                         }
                       }
                     },
                     itemBuilder: (context) => const [
-                      PopupMenuItem(
-                          value: 'Confirmed', child: Text('تأكيد الموعد')),
-                      PopupMenuItem(
-                          value: 'Rejected', child: Text('رفض الموعد')),
+                      PopupMenuItem(value: 'Confirmed', child: Text('تأكيد الموعد')),
+                      PopupMenuItem(value: 'Rejected', child: Text('رفض الموعد')),
                       PopupMenuDivider(),
                       PopupMenuItem(
                         value: 'cancel',
@@ -535,8 +531,7 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.folder_shared_outlined,
-                size: 64, color: Colors.grey),
+            const Icon(Icons.folder_shared_outlined, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
             const Text(
               'لا يوجد سجلات طبية لهذا المريض حتى الآن',
@@ -563,7 +558,7 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
         padding: const EdgeInsets.all(16),
         itemCount: _medicalRecords.length,
         itemBuilder: (_, i) {
-          final r = _medicalRecords[i];
+          final r = _medicalRecords[i] as Map;
           final dateText = _formatDateTime(r['visitDate']);
           final diagnosis = (r['diagnosis'] ?? '').toString();
           final notes = (r['notes'] ?? '').toString();
@@ -576,15 +571,12 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
           return Card(
             elevation: 3,
             margin: const EdgeInsets.only(bottom: 12),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // العنوان + التاريخ
                   Row(
                     children: [
                       Container(
@@ -613,50 +605,37 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
                   if (dateText.isNotEmpty)
                     Text(
                       dateText,
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                     ),
                   const SizedBox(height: 8),
                   if (notes.isNotEmpty) ...[
                     const Text(
                       'الملاحظات:',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 13),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                     Text(notes),
                     const SizedBox(height: 6),
                   ],
-                  if (med.isNotEmpty ||
-                      allg.isNotEmpty ||
-                      side.isNotEmpty) ...[
+                  if (med.isNotEmpty || allg.isNotEmpty || side.isNotEmpty) ...[
                     Wrap(
                       spacing: 6,
                       runSpacing: 4,
                       children: [
                         if (med.isNotEmpty)
+                          const SizedBox.shrink(),
+                        if (med.isNotEmpty)
                           Chip(
-                            label: Text(
-                              'دواء: $med',
-                              style: const TextStyle(fontSize: 12),
-                            ),
+                            label: Text('دواء: $med', style: const TextStyle(fontSize: 12)),
                             backgroundColor: const Color(0xFFE3F2FD),
                           ),
                         if (allg.isNotEmpty)
                           Chip(
-                            label: Text(
-                              'حساسية: $allg',
-                              style: const TextStyle(fontSize: 12),
-                            ),
+                            label: Text('حساسية: $allg', style: const TextStyle(fontSize: 12)),
                             backgroundColor: const Color(0xFFFFEBEE),
                           ),
                         if (side.isNotEmpty)
                           Chip(
-                            label: Text(
-                              'آثار جانبية: $side',
-                              style: const TextStyle(fontSize: 12),
-                            ),
+                            label: Text('آثار جانبية: $side', style: const TextStyle(fontSize: 12)),
                             backgroundColor: const Color(0xFFFFF8E1),
                           ),
                       ],
@@ -677,10 +656,7 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
                       if (docSpec.isNotEmpty)
                         Text(
                           docSpec,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade700,
-                          ),
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                         ),
                     ],
                   ),

@@ -10,7 +10,6 @@ import 'package:healthcare_flutter_app/screens/doctor/patient_medical_records_fo
 import 'package:healthcare_flutter_app/screens/doctor/doctor_add_medical_record_screen.dart';
 
 class DoctorHomeShell extends StatefulWidget {
-  // ✅ 4 Tabs فقط (0..3)
   final int initialTab;
 
   const DoctorHomeShell({super.key, this.initialTab = 0});
@@ -33,7 +32,7 @@ class _DoctorHomeShellState extends State<DoctorHomeShell> {
   void initState() {
     super.initState();
     _currentIndex = _clampTab(widget.initialTab);
-    _pageController = PageController(keepPage: true, initialPage: _currentIndex);
+       _pageController = PageController(keepPage: true, initialPage: _currentIndex);
     _loadAppointments();
   }
 
@@ -49,7 +48,7 @@ class _DoctorHomeShellState extends State<DoctorHomeShell> {
     try {
       final data = await ApiService.getDoctorAppointments();
       if (!mounted) return;
-      setState(() => _appointments = (data ?? []));
+      setState(() => _appointments = (data));
     } catch (e) {
       debugPrint("DoctorHomeShell _loadAppointments error: $e");
       if (!mounted) return;
@@ -183,7 +182,7 @@ class _DashboardTab extends StatelessWidget {
   }
 }
 
-/// 🔹 تبويب المواعيد للطبيب
+/// 🔹 تبويب المواعيد للطبيب (مصمم ليكون آمن لو الداتا رجعت بصيغة مختلفة)
 class _AppointmentsTab extends StatelessWidget {
   final bool loading;
   final List<dynamic> appointments;
@@ -214,6 +213,8 @@ class _AppointmentsTab extends StatelessWidget {
     return 'قيد الانتظار';
   }
 
+  Map<String, dynamic>? _asMap(dynamic x) => x is Map<String, dynamic> ? x : null;
+
   @override
   Widget build(BuildContext context) {
     if (loading) {
@@ -233,18 +234,29 @@ class _AppointmentsTab extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         itemCount: appointments.length,
         itemBuilder: (_, i) {
-          final a = appointments[i];
+          final a = _asMap(appointments[i]);
+          if (a == null) {
+            return const SizedBox.shrink(); // تجاهل عنصر غير صحيح
+          }
 
-          final patientName =
-              a['patient']?['fullName'] ?? a['patientName'] ?? 'Patient';
+          // patient ممكن يكون Map أو اسم نصي
+          final patientObj = a['patient'];
+          String patientName = 'Patient';
+          if (patientObj is Map) {
+            patientName = (patientObj['fullName'] ?? patientObj['name'] ?? 'Patient').toString();
+          } else {
+            patientName = (a['patientName'] ?? 'Patient').toString();
+          }
 
-          final startsAtStr = a['startsAt']?.toString() ?? '';
+          final startsAtStr = (a['startsAt'] ?? '').toString();
           final startsAt = DateTime.tryParse(startsAtStr);
           final dateText = startsAt == null
               ? startsAtStr
               : DateFormat('y/MM/dd • HH:mm').format(startsAt.toLocal());
 
           final status = (a['status'] ?? 'Pending').toString();
+          final rawId = a['id'];
+          final intId = (rawId is int) ? rawId : int.tryParse(rawId?.toString() ?? '') ?? -1;
 
           return Card(
             elevation: 3,
@@ -262,25 +274,34 @@ class _AppointmentsTab extends StatelessWidget {
               ),
               subtitle: Text(
                 '$dateText\nالحالة: ${_statusLabel(status)}',
-                maxLines: 2,
+                maxLines: 3,
               ),
               trailing: PopupMenuButton<String>(
                 icon: Icon(Icons.more_vert, color: _statusColor(status)),
                 onSelected: (value) async {
-                  final ok = await ApiService.updateAppointmentStatus(a['id'], value);
+                  if (intId <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('معرّف الموعد غير صالح')),
+                    );
+                    return;
+                  }
+
+                  final ok = await ApiService.updateAppointmentStatus(intId, value);
                   if (!context.mounted) return;
 
                   if (ok) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          value == 'confirmed'
+                          value.toLowerCase() == 'confirmed'
                               ? 'تم تأكيد الموعد ✅'
-                              : 'تم رفض الموعد ❌',
+                              : value.toLowerCase() == 'rejected'
+                                  ? 'تم رفض الموعد ❌'
+                                  : 'تم تحديث الحالة ✅',
                         ),
                       ),
                     );
-                    onRefresh();
+                    await onRefresh();
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('فشل في تحديث حالة الموعد')),
@@ -301,9 +322,6 @@ class _AppointmentsTab extends StatelessWidget {
 }
 
 /// ✅ تبويب السجلات الطبية للطبيب
-/// قائمة مرضى (مستخرجة من مواعيد الطبيب) + زر "السجل" ذكي:
-/// - إذا لا يوجد سجلات → يفتح إنشاء سجل مباشرة
-/// - إذا يوجد سجلات → يفتح شاشة السجلات
 class _RecordsTab extends StatefulWidget {
   const _RecordsTab({super.key});
 
@@ -359,6 +377,7 @@ class _RecordsTabState extends State<_RecordsTab> {
     required int patientId,
     required String patientName,
   }) async {
+    if (patientId <= 0) return;
     if (_openingPatientIds.contains(patientId)) return;
 
     setState(() => _openingPatientIds.add(patientId));
@@ -380,9 +399,8 @@ class _RecordsTabState extends State<_RecordsTab> {
           ),
         );
 
-        // لو حفظ → ممكن تعمل تحديث (اختياري)
         if (ok == true) {
-          // لا حاجة لإعادة تحميل المرضى عادةً
+          // optional: refresh
         }
       } else {
         // ✅ يوجد سجلات → افتح شاشة السجلات
@@ -441,10 +459,12 @@ class _RecordsTabState extends State<_RecordsTab> {
         itemBuilder: (_, i) {
           final p = _patients[i];
 
-          final id = int.tryParse(p['id']?.toString() ?? '') ?? 0;
+          final id = int.tryParse(p['id']?.toString() ?? '') ?? -1;
           final name = (p['fullName'] ?? 'Patient').toString();
           final phone = (p['phoneNumber'] ?? '').toString();
           final isOpening = _openingPatientIds.contains(id);
+
+          if (id <= 0) return const SizedBox.shrink();
 
           return Card(
             elevation: 3,

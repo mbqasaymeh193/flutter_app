@@ -173,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const Text('ليس لديك حساب؟'),
                     TextButton(
                       onPressed: () =>
-                          Navigator.pushNamed(context, AppRoutes.register),
+                          Navigator.pushNamed(context, AppRoutes.signup),
                       child: const Text('إنشاء حساب جديد'),
                     ),
                   ],

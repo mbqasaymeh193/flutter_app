@@ -191,7 +191,6 @@ class ApiService {
   // ====================== Auth ======================
 
   /// 🔐 تسجيل الدخول
-  /// ✅ يعالج اختلاف الحقول: fullName/name + userId/id + role
   static Future<Map<String, dynamic>?> login(String email, String password) async {
     try {
       final res = await _post(
@@ -218,19 +217,12 @@ class ApiService {
         final name = _pickString(map, ["fullName", "FullName", "name", "Name"]) ?? "";
         final userId = _pickInt(map, ["userId", "UserId", "id", "Id"]);
 
-        // ✅ نخزن بيانات المستخدم أيضًا (حتى لو LoginScreen ما خزّنها)
         await saveUserInfo(role: role, name: name, userId: userId);
 
-        // ✅ لتوافق LoginScreen الحالي اللي يقرأ result['name']
-        if (map['name'] == null || map['name'].toString().isEmpty) {
-          map['name'] = name;
-        }
-        if (map['fullName'] == null || map['fullName'].toString().isEmpty) {
-          map['fullName'] = name;
-        }
-        if (map['userId'] == null && userId != null) {
-          map['userId'] = userId;
-        }
+        // لتوافق LoginScreen
+        map['name'] ??= name;
+        map['fullName'] ??= name;
+        if (map['userId'] == null && userId != null) map['userId'] = userId;
 
         return map;
       }
@@ -286,7 +278,6 @@ class ApiService {
     }
   }
 
-  /// ⚠️ Password endpoints تعتمد على وجودها في الباك-اند (إذا ما كانت موجودة سترجع 404)
   static Future<bool> forgotPassword(String email) async {
     try {
       final res = await _postWithFallback(
@@ -319,6 +310,9 @@ class ApiService {
     }
   }
 
+  /// ✅ ملاحظة: الباك-اند عندك يتطلب (Email + Code + NewPassword).
+  /// تركتها هنا “كما هي” حتى لا تكسر شاشات قديمة عندك.
+  /// لو شاشة reset عندك فيها code، استخدم الدالة الجديدة resetPasswordWithCode.
   static Future<bool> resetPassword(String email, String newPassword) async {
     try {
       final res = await _postWithFallback(
@@ -329,6 +323,29 @@ class ApiService {
     } catch (e) {
       // ignore: avoid_print
       print("resetPassword error: $e");
+      return false;
+    }
+  }
+
+  /// ✅ الدالة الصحيحة المتوافقة مع الباك-اند الحالي عندك
+  static Future<bool> resetPasswordWithCode({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      final res = await _post(
+        "/api/password/reset",
+        body: {
+          "email": email,
+          "code": code,
+          "newPassword": newPassword,
+        },
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      // ignore: avoid_print
+      print("resetPasswordWithCode error: $e");
       return false;
     }
   }
@@ -352,6 +369,25 @@ class ApiService {
       print("getDoctors error: $e");
       return [];
     }
+  }
+
+  // ✅✅ FIX: هذا Alias حتى AdminHomeShell يشتغل بدون تعديل
+  static Future<List<Map<String, dynamic>>> getAllDoctors() async {
+    final list = await getDoctors();
+    return list
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  // (اختياري) لو احتجته لاحقًا للأدمن
+  static Future<List<Map<String, dynamic>>> getAllPatients() async {
+    final users = await getAllUsers();
+    return users
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .where((u) => (u['role'] ?? '').toString().toLowerCase() == 'patient')
+        .toList();
   }
 
   // ================= Appointments ===================
@@ -448,6 +484,103 @@ class ApiService {
     if (lower == 'rejected') return 'Rejected';
     if (lower == 'pending') return 'Pending';
     return s;
+  }
+
+  // ================= Admin: Doctors approvals =================
+
+  static Future<List<Map<String, dynamic>>> getPendingDoctors() async {
+    await loadToken();
+    if (token == null) return [];
+
+    try {
+      final res = await http.get(
+        _url("/api/admin/doctors/pending"),
+        headers: _jsonHeaders(withAuth: true),
+      );
+
+      if (res.statusCode == 200) {
+        final data = _tryDecode(res.body);
+        if (data is List) {
+          return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        }
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print("getPendingDoctors error: $e");
+    }
+
+    return [];
+  }
+
+  static Future<bool> approveDoctor(int doctorId) async {
+    await loadToken();
+    if (token == null) return false;
+
+    try {
+      final res = await http.put(
+        _url("/api/admin/doctors/$doctorId/approve"),
+        headers: _jsonHeaders(withAuth: true),
+      );
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (e) {
+      // ignore: avoid_print
+      print("approveDoctor error: $e");
+      return false;
+    }
+  }
+
+  static Future<bool> rejectDoctor(int doctorId) async {
+    await loadToken();
+    if (token == null) return false;
+
+    try {
+      final res = await http.put(
+        _url("/api/admin/doctors/$doctorId/reject"),
+        headers: _jsonHeaders(withAuth: true),
+      );
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (e) {
+      // ignore: avoid_print
+      print("rejectDoctor error: $e");
+      return false;
+    }
+  }
+
+  // ================= Admin: Users management =================
+
+  static Future<bool> setUserActive(int userId, bool isActive) async {
+    await loadToken();
+    if (token == null) return false;
+
+    try {
+      final res = await http.put(
+        _url("/api/admin/users/$userId/set-active"),
+        headers: _jsonHeaders(withAuth: true),
+        body: jsonEncode({"isActive": isActive}),
+      );
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (e) {
+      // ignore: avoid_print
+      print("setUserActive error: $e");
+      return false;
+    }
+  }
+
+  static Future<bool> softDeleteUser(int userId) async {
+    await loadToken();
+    if (token == null) return false;
+
+    try {
+      final res = await http.delete(
+        _url("/api/admin/users/$userId"),
+        headers: _jsonHeaders(withAuth: true),
+      );
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (e) {
+      // ignore: avoid_print
+      print("softDeleteUser error: $e");
+      return false;
+    }
   }
 
   /// ✅ مطابق للباك-اند: PUT /api/appointments/{id}/status
@@ -661,7 +794,6 @@ class ApiService {
 
   // ================= Doctor Patients Helper =================
 
-  /// ✅ استخرج قائمة مرضى فريدين من مواعيد الطبيب (بدون endpoint إضافي)
   static Future<List<Map<String, dynamic>>> getPatientsFromDoctorAppointments() async {
     final apps = await getDoctorAppointments();
     final Map<int, Map<String, dynamic>> unique = {};
@@ -693,7 +825,6 @@ class ApiService {
     return unique.values.toList();
   }
 
-  /// ✅ Endpoint موجود عندك بالباك-اند: GET /api/doctor/patients
   static Future<List<dynamic>> getDoctorPatients() async {
     await loadToken();
     if (token == null) return [];
@@ -740,7 +871,6 @@ class ApiService {
     }
   }
 
-  /// الباك اند يرجع: { "unread": 5 }
   static Future<int> getUnreadCount() async {
     await loadToken();
     if (token == null) return 0;
@@ -777,6 +907,63 @@ class ApiService {
     } catch (e) {
       // ignore: avoid_print
       print("markNotificationRead error: $e");
+      return false;
+    }
+  }
+    // ====================== DELETE Helpers ======================
+
+  static Future<http.Response> _delete(
+    String path, {
+    bool withAuth = false,
+  }) async {
+    final res = await http
+        .delete(_url(path), headers: _jsonHeaders(withAuth: withAuth))
+        .timeout(_timeout);
+    return res;
+  }
+
+  static Future<http.Response> _deleteWithFallback(
+    List<String> paths, {
+    bool withAuth = false,
+  }) async {
+    http.Response? last;
+    for (final p in paths) {
+      final res = await _delete(p, withAuth: withAuth);
+      last = res;
+      if (!_isNotFound(res)) return res;
+    }
+    return last ?? http.Response("Not Found", 404);
+  }
+    // ================= Compatibility APIs =================
+
+  /// ✅ Compatibility: بعض الشاشات تستدعي هذا الاسم
+  static Future<List<dynamic>> getPatientMedicalRecords(int patientId) async {
+    return getMedicalRecordsForPatient(patientId);
+  }
+
+  /// ✅ Cancel/Delete appointment (حاول أكثر من endpoint)
+  static Future<bool> cancelAppointment(dynamic id) async {
+    await loadToken();
+    if (token == null) return false;
+
+    final int? intId = int.tryParse(id.toString());
+    if (intId == null) return false;
+
+    try {
+      // جرّب endpoints شائعة (اختَر الذي يطابق الباك-اند عندك)
+      final res = await _deleteWithFallback(
+        [
+          "/api/appointments/$intId",           // DELETE appointment
+          "/api/appointments/$intId/cancel",    // Cancel endpoint
+          "/api/doctor/appointments/$intId",    // أحياناً تكون تحت doctor
+        ],
+        withAuth: true,
+      );
+
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (e) {
+      // ignore: avoid_print
+      print("cancelAppointment error: $e");
       return false;
     }
   }
