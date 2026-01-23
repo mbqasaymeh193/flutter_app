@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../config/app_config.dart';
 
 class ApiService {
@@ -62,6 +64,8 @@ class ApiService {
 
   // ====================== Helpers ======================
 
+  /// ✅ AppConfig.apiBaseUrl يجب أن يكون مثل:
+  /// http://127.0.0.1:7000/api
   static Uri _url(String path) => Uri.parse("${AppConfig.apiBaseUrl}$path");
 
   static Map<String, String> _jsonHeaders({bool withAuth = false}) {
@@ -110,10 +114,9 @@ class ApiService {
     String path, {
     bool withAuth = false,
   }) async {
-    final res = await http
+    return http
         .get(_url(path), headers: _jsonHeaders(withAuth: withAuth))
         .timeout(_timeout);
-    return res;
   }
 
   static Future<http.Response> _post(
@@ -121,14 +124,13 @@ class ApiService {
     bool withAuth = false,
     Map<String, dynamic>? body,
   }) async {
-    final res = await http
+    return http
         .post(
           _url(path),
           headers: _jsonHeaders(withAuth: withAuth),
           body: body == null ? null : jsonEncode(body),
         )
         .timeout(_timeout);
-    return res;
   }
 
   static Future<http.Response> _put(
@@ -136,14 +138,22 @@ class ApiService {
     bool withAuth = false,
     Map<String, dynamic>? body,
   }) async {
-    final res = await http
+    return http
         .put(
           _url(path),
           headers: _jsonHeaders(withAuth: withAuth),
           body: body == null ? null : jsonEncode(body),
         )
         .timeout(_timeout);
-    return res;
+  }
+
+  static Future<http.Response> _delete(
+    String path, {
+    bool withAuth = false,
+  }) async {
+    return http
+        .delete(_url(path), headers: _jsonHeaders(withAuth: withAuth))
+        .timeout(_timeout);
   }
 
   /// Helper: جرّب أكثر من Endpoint لنفس العملية (Fallback)
@@ -188,13 +198,28 @@ class ApiService {
     return last ?? http.Response("Not Found", 404);
   }
 
+  static Future<http.Response> _deleteWithFallback(
+    List<String> paths, {
+    bool withAuth = false,
+  }) async {
+    http.Response? last;
+    for (final p in paths) {
+      final res = await _delete(p, withAuth: withAuth);
+      last = res;
+      if (!_isNotFound(res)) return res;
+    }
+    return last ?? http.Response("Not Found", 404);
+  }
+
   // ====================== Auth ======================
 
   /// 🔐 تسجيل الدخول
+  /// ✅ Endpoint الصحيح عندك: POST /api/login
+  /// وبما أن baseUrl يحتوي /api => هنا نستخدم "/login"
   static Future<Map<String, dynamic>?> login(String email, String password) async {
     try {
       final res = await _post(
-        "/api/login",
+        "/login",
         body: {"email": email, "password": password},
       );
 
@@ -214,12 +239,13 @@ class ApiService {
         }
 
         final role = _pickString(map, ["role", "Role"]) ?? "";
-        final name = _pickString(map, ["fullName", "FullName", "name", "Name"]) ?? "";
+        final name =
+            _pickString(map, ["fullName", "FullName", "name", "Name"]) ?? "";
         final userId = _pickInt(map, ["userId", "UserId", "id", "Id"]);
 
         await saveUserInfo(role: role, name: name, userId: userId);
 
-        // لتوافق LoginScreen
+        // لتوافق الشاشات
         map['name'] ??= name;
         map['fullName'] ??= name;
         if (map['userId'] == null && userId != null) map['userId'] = userId;
@@ -239,31 +265,75 @@ class ApiService {
     }
   }
 
+  Map<String, String> _splitName(String fullName) {
+    final parts = fullName
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+
+    if (parts.isEmpty) return {'firstName': '', 'lastName': ''};
+    if (parts.length == 1) {
+      return {'firstName': parts.first, 'lastName': parts.first};
+    }
+    return {
+      'firstName': parts.first,
+      'lastName': parts.sublist(1).join(' '),
+    };
+  }
+
   /// 🧾 إنشاء حساب جديد
+  /// ✅ Endpoint الصحيح عندك: POST /api/register
+  /// وبما أن baseUrl يحتوي /api => هنا نستخدم "/register"
+  ///
+  /// ✅ يدعم طريقتين:
+  /// 1) fullName (للشاشات القديمة)
+  /// 2) firstName + lastName (+ باقي الحقول)
   static Future<bool> register({
-    required String firstName,
-    required String lastName,
+    String? fullName,
+    String? firstName,
+    String? lastName,
     required String email,
     required String password,
-    required String nationalId,
-    required String phoneNumber,
+    String? nationalId,
+    String? phoneNumber,
     String role = "Patient",
     String? specialty,
   }) async {
     try {
-      final res = await _post(
-        "/api/register",
-        body: {
-          "firstName": firstName,
-          "lastName": lastName,
-          "email": email,
-          "password": password,
-          "nationalId": nationalId,
-          "phoneNumber": phoneNumber,
-          "role": role,
-          "specialty": specialty,
-        },
-      );
+      String fn = (firstName ?? '').trim();
+      String ln = (lastName ?? '').trim();
+
+      if ((fn.isEmpty || ln.isEmpty) && (fullName ?? '').trim().isNotEmpty) {
+        final parts = ApiService()._splitName(fullName!.trim());
+        fn = parts['firstName'] ?? fn;
+        ln = parts['lastName'] ?? ln;
+      }
+
+      final body = <String, dynamic>{
+        "email": email,
+        "password": password,
+        "role": role,
+      };
+
+      // ✅ أرسل الاسم بالطريقة المتاحة
+      if (fn.isNotEmpty && ln.isNotEmpty) {
+        body["firstName"] = fn;
+        body["lastName"] = ln;
+      } else if ((fullName ?? '').trim().isNotEmpty) {
+        body["fullName"] = fullName!.trim();
+      }
+
+      // ✅ حقول اختيارية
+      if ((nationalId ?? '').trim().isNotEmpty) body["nationalId"] = nationalId!.trim();
+      if ((phoneNumber ?? '').trim().isNotEmpty) body["phoneNumber"] = phoneNumber!.trim();
+
+      final isDoctor = role.toLowerCase() == 'doctor';
+      if (isDoctor && (specialty ?? '').trim().isNotEmpty) {
+        body["specialty"] = specialty!.trim();
+      }
+
+      final res = await _post("/register", body: body);
 
       // ignore: avoid_print
       print("📦 Register status: ${res.statusCode}");
@@ -281,7 +351,7 @@ class ApiService {
   static Future<bool> forgotPassword(String email) async {
     try {
       final res = await _postWithFallback(
-        const ["/api/password/forgot", "/api/auth/forgot-password"],
+        const ["/password/forgot"],
         body: {"email": email},
       );
       return res.statusCode == 200;
@@ -298,7 +368,7 @@ class ApiService {
 
     try {
       final res = await _putWithFallback(
-        const ["/api/password/change", "/api/auth/change-password"],
+        const ["/password/change"],
         withAuth: true,
         body: {"oldPassword": oldPass, "newPassword": newPass},
       );
@@ -310,13 +380,10 @@ class ApiService {
     }
   }
 
-  /// ✅ ملاحظة: الباك-اند عندك يتطلب (Email + Code + NewPassword).
-  /// تركتها هنا “كما هي” حتى لا تكسر شاشات قديمة عندك.
-  /// لو شاشة reset عندك فيها code، استخدم الدالة الجديدة resetPasswordWithCode.
   static Future<bool> resetPassword(String email, String newPassword) async {
     try {
       final res = await _postWithFallback(
-        const ["/api/password/reset", "/api/auth/reset-password"],
+        const ["/password/reset"],
         body: {"email": email, "newPassword": newPassword},
       );
       return res.statusCode == 200;
@@ -327,7 +394,6 @@ class ApiService {
     }
   }
 
-  /// ✅ الدالة الصحيحة المتوافقة مع الباك-اند الحالي عندك
   static Future<bool> resetPasswordWithCode({
     required String email,
     required String code,
@@ -335,7 +401,7 @@ class ApiService {
   }) async {
     try {
       final res = await _post(
-        "/api/password/reset",
+        "/password/reset",
         body: {
           "email": email,
           "code": code,
@@ -354,7 +420,7 @@ class ApiService {
 
   static Future<List<dynamic>> getDoctors() async {
     try {
-      final res = await _get("/api/doctors");
+      final res = await _get("/doctors");
       // ignore: avoid_print
       print("👩‍⚕️ getDoctors status: ${res.statusCode}");
 
@@ -371,16 +437,12 @@ class ApiService {
     }
   }
 
-  // ✅✅ FIX: هذا Alias حتى AdminHomeShell يشتغل بدون تعديل
+  // ✅✅ Alias (إن احتجته)
   static Future<List<Map<String, dynamic>>> getAllDoctors() async {
     final list = await getDoctors();
-    return list
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
-  // (اختياري) لو احتجته لاحقًا للأدمن
   static Future<List<Map<String, dynamic>>> getAllPatients() async {
     final users = await getAllUsers();
     return users
@@ -405,7 +467,7 @@ class ApiService {
 
     try {
       final res = await _post(
-        "/api/appointments/book",
+        "/appointments/book",
         withAuth: true,
         body: {
           "doctorId": id,
@@ -432,7 +494,7 @@ class ApiService {
     if (token == null) return [];
 
     try {
-      final res = await _get("/api/appointments/mine", withAuth: true);
+      final res = await _get("/appointments/mine", withAuth: true);
 
       // ignore: avoid_print
       print("📋 getMyAppointments status: ${res.statusCode}");
@@ -455,7 +517,7 @@ class ApiService {
     if (token == null) return [];
 
     try {
-      final res = await _get("/api/doctor/appointments", withAuth: true);
+      final res = await _get("/doctor/appointments", withAuth: true);
 
       // ignore: avoid_print
       print("📦 Doctor appointments status: ${res.statusCode}");
@@ -486,6 +548,31 @@ class ApiService {
     return s;
   }
 
+  /// ✅ مطابق للباك-اند: PUT /api/appointments/{id}/status
+  static Future<bool> updateAppointmentStatus(dynamic id, String status) async {
+    await loadToken();
+    if (token == null) return false;
+
+    final int? intId = int.tryParse(id.toString());
+    if (intId == null) return false;
+
+    try {
+      final res = await _put(
+        "/appointments/$intId/status",
+        withAuth: true,
+        body: {"status": _normalizeStatus(status)},
+      );
+
+      // ignore: avoid_print
+      print("🔄 updateAppointmentStatus [$intId] => ${res.statusCode}");
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (e) {
+      // ignore: avoid_print
+      print("updateAppointmentStatus error: $e");
+      return false;
+    }
+  }
+
   // ================= Admin: Doctors approvals =================
 
   static Future<List<Map<String, dynamic>>> getPendingDoctors() async {
@@ -493,15 +580,18 @@ class ApiService {
     if (token == null) return [];
 
     try {
-      final res = await http.get(
-        _url("/api/admin/doctors/pending"),
-        headers: _jsonHeaders(withAuth: true),
-      );
+      final res = await _get("/admin/doctors/pending", withAuth: true);
 
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
         if (data is List) {
           return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        }
+        if (data is Map && data['items'] is List) {
+          return List<dynamic>.from(data['items'])
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
         }
       }
     } catch (e) {
@@ -517,10 +607,7 @@ class ApiService {
     if (token == null) return false;
 
     try {
-      final res = await http.put(
-        _url("/api/admin/doctors/$doctorId/approve"),
-        headers: _jsonHeaders(withAuth: true),
-      );
+      final res = await _put("/admin/doctors/$doctorId/approve", withAuth: true);
       return res.statusCode == 200 || res.statusCode == 204;
     } catch (e) {
       // ignore: avoid_print
@@ -534,10 +621,7 @@ class ApiService {
     if (token == null) return false;
 
     try {
-      final res = await http.put(
-        _url("/api/admin/doctors/$doctorId/reject"),
-        headers: _jsonHeaders(withAuth: true),
-      );
+      final res = await _put("/admin/doctors/$doctorId/reject", withAuth: true);
       return res.statusCode == 200 || res.statusCode == 204;
     } catch (e) {
       // ignore: avoid_print
@@ -553,10 +637,10 @@ class ApiService {
     if (token == null) return false;
 
     try {
-      final res = await http.put(
-        _url("/api/admin/users/$userId/set-active"),
-        headers: _jsonHeaders(withAuth: true),
-        body: jsonEncode({"isActive": isActive}),
+      final res = await _put(
+        "/admin/users/$userId/set-active",
+        withAuth: true,
+        body: {"isActive": isActive},
       );
       return res.statusCode == 200 || res.statusCode == 204;
     } catch (e) {
@@ -571,39 +655,11 @@ class ApiService {
     if (token == null) return false;
 
     try {
-      final res = await http.delete(
-        _url("/api/admin/users/$userId"),
-        headers: _jsonHeaders(withAuth: true),
-      );
+      final res = await _delete("/admin/users/$userId", withAuth: true);
       return res.statusCode == 200 || res.statusCode == 204;
     } catch (e) {
       // ignore: avoid_print
       print("softDeleteUser error: $e");
-      return false;
-    }
-  }
-
-  /// ✅ مطابق للباك-اند: PUT /api/appointments/{id}/status
-  static Future<bool> updateAppointmentStatus(dynamic id, String status) async {
-    await loadToken();
-    if (token == null) return false;
-
-    final int? intId = int.tryParse(id.toString());
-    if (intId == null) return false;
-
-    try {
-      final res = await _put(
-        "/api/appointments/$intId/status",
-        withAuth: true,
-        body: {"status": _normalizeStatus(status)},
-      );
-
-      // ignore: avoid_print
-      print("🔄 updateAppointmentStatus [$intId] => ${res.statusCode}");
-      return res.statusCode == 200 || res.statusCode == 204;
-    } catch (e) {
-      // ignore: avoid_print
-      print("updateAppointmentStatus error: $e");
       return false;
     }
   }
@@ -615,7 +671,7 @@ class ApiService {
     if (token == null) return [];
 
     try {
-      final res = await _get("/api/admin/appointments", withAuth: true);
+      final res = await _get("/admin/appointments", withAuth: true);
 
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
@@ -635,7 +691,7 @@ class ApiService {
     if (token == null) return [];
 
     try {
-      final res = await _get("/api/admin/users", withAuth: true);
+      final res = await _get("/admin/users", withAuth: true);
 
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
@@ -664,7 +720,7 @@ class ApiService {
     }
 
     try {
-      final res = await _get("/api/admin/stats", withAuth: true);
+      final res = await _get("/admin/stats", withAuth: true);
       final data = _tryDecode(res.body);
 
       if (res.statusCode == 200 && data is Map) {
@@ -697,7 +753,7 @@ class ApiService {
 
     try {
       final res = await _post(
-        "/api/medical-records",
+        "/medical-records",
         withAuth: true,
         body: {
           "patientId": patientId,
@@ -730,7 +786,7 @@ class ApiService {
 
     try {
       final res = await _put(
-        "/api/medical-records/$recordId",
+        "/medical-records/$recordId",
         withAuth: true,
         body: {
           "diagnosis": diagnosis,
@@ -755,7 +811,7 @@ class ApiService {
 
     try {
       final res = await _get(
-        "/api/medical-records/patient/$patientId",
+        "/medical-records/patient/$patientId",
         withAuth: true,
       );
 
@@ -777,7 +833,7 @@ class ApiService {
     if (token == null) return [];
 
     try {
-      final res = await _get("/api/medical-records/mine", withAuth: true);
+      final res = await _get("/medical-records/mine", withAuth: true);
 
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
@@ -789,6 +845,41 @@ class ApiService {
       // ignore: avoid_print
       print("getMyMedicalRecords error: $e");
       return [];
+    }
+  }
+
+  // ================= Compatibility APIs =================
+
+  /// ✅ Compatibility: بعض الشاشات تستدعي هذا الاسم
+  static Future<List<dynamic>> getPatientMedicalRecords(int patientId) async {
+    return getMedicalRecordsForPatient(patientId);
+  }
+
+  /// ⚠️ ملاحظة مهمة:
+  /// حسب قائمة endpoints التي أرسلتها: لا يوجد DELETE لإلغاء الموعد.
+  /// هذه الدالة ستُرجع false غالباً (404) إلا إذا عندك endpoint مخفي.
+  static Future<bool> cancelAppointment(dynamic id) async {
+    await loadToken();
+    if (token == null) return false;
+
+    final int? intId = int.tryParse(id.toString());
+    if (intId == null) return false;
+
+    try {
+      final res = await _deleteWithFallback(
+        [
+          "/appointments/$intId",
+          "/appointments/$intId/cancel",
+          "/doctor/appointments/$intId",
+        ],
+        withAuth: true,
+      );
+
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (e) {
+      // ignore: avoid_print
+      print("cancelAppointment error: $e");
+      return false;
     }
   }
 
@@ -831,7 +922,7 @@ class ApiService {
 
     try {
       final res = await _getWithFallback(
-        const ["/api/doctor/patients", "/api/doctor/patients/list"],
+        const ["/doctor/patients"],
         withAuth: true,
       );
 
@@ -854,7 +945,7 @@ class ApiService {
     if (token == null) return [];
 
     try {
-      final res = await _get("/api/notifications/mine", withAuth: true);
+      final res = await _get("/notifications/mine", withAuth: true);
 
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
@@ -876,7 +967,7 @@ class ApiService {
     if (token == null) return 0;
 
     try {
-      final res = await _get("/api/notifications/unread-count", withAuth: true);
+      final res = await _get("/notifications/unread-count", withAuth: true);
 
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
@@ -902,68 +993,11 @@ class ApiService {
     if (token == null) return false;
 
     try {
-      final res = await _put("/api/notifications/$id/read", withAuth: true);
+      final res = await _put("/notifications/$id/read", withAuth: true);
       return res.statusCode == 200 || res.statusCode == 204;
     } catch (e) {
       // ignore: avoid_print
       print("markNotificationRead error: $e");
-      return false;
-    }
-  }
-    // ====================== DELETE Helpers ======================
-
-  static Future<http.Response> _delete(
-    String path, {
-    bool withAuth = false,
-  }) async {
-    final res = await http
-        .delete(_url(path), headers: _jsonHeaders(withAuth: withAuth))
-        .timeout(_timeout);
-    return res;
-  }
-
-  static Future<http.Response> _deleteWithFallback(
-    List<String> paths, {
-    bool withAuth = false,
-  }) async {
-    http.Response? last;
-    for (final p in paths) {
-      final res = await _delete(p, withAuth: withAuth);
-      last = res;
-      if (!_isNotFound(res)) return res;
-    }
-    return last ?? http.Response("Not Found", 404);
-  }
-    // ================= Compatibility APIs =================
-
-  /// ✅ Compatibility: بعض الشاشات تستدعي هذا الاسم
-  static Future<List<dynamic>> getPatientMedicalRecords(int patientId) async {
-    return getMedicalRecordsForPatient(patientId);
-  }
-
-  /// ✅ Cancel/Delete appointment (حاول أكثر من endpoint)
-  static Future<bool> cancelAppointment(dynamic id) async {
-    await loadToken();
-    if (token == null) return false;
-
-    final int? intId = int.tryParse(id.toString());
-    if (intId == null) return false;
-
-    try {
-      // جرّب endpoints شائعة (اختَر الذي يطابق الباك-اند عندك)
-      final res = await _deleteWithFallback(
-        [
-          "/api/appointments/$intId",           // DELETE appointment
-          "/api/appointments/$intId/cancel",    // Cancel endpoint
-          "/api/doctor/appointments/$intId",    // أحياناً تكون تحت doctor
-        ],
-        withAuth: true,
-      );
-
-      return res.statusCode == 200 || res.statusCode == 204;
-    } catch (e) {
-      // ignore: avoid_print
-      print("cancelAppointment error: $e");
       return false;
     }
   }
@@ -973,7 +1007,7 @@ class ApiService {
     if (token == null) return false;
 
     try {
-      final res = await _put("/api/notifications/read-all", withAuth: true);
+      final res = await _put("/notifications/read-all", withAuth: true);
       return res.statusCode == 200 || res.statusCode == 204;
     } catch (e) {
       // ignore: avoid_print

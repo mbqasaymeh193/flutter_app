@@ -23,14 +23,21 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  void _showSnack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   Future<void> _login() async {
+    if (_isLoading) return; // ✅ منع التكرار
+
+    FocusScope.of(context).unfocus(); // ✅ اغلاق الكيبورد
+
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يرجى إدخال البريد وكلمة المرور')),
-      );
+      _showSnack('يرجى إدخال البريد وكلمة المرور');
       return;
     }
 
@@ -42,19 +49,21 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      final role = (result?['role'] ?? '').toString().toLowerCase();
-      final token = (result?['token'] ?? '').toString();
-
-      if (token.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('بيانات تسجيل الدخول غير صحيحة ❌')),
-        );
+      if (result == null) {
+        // غالباً: 404 بسبب baseUrl غلط / أو 401 بيانات غلط / أو Exception
+        _showSnack('فشل تسجيل الدخول ❌ (تحقق من رابط السيرفر والبيانات)');
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تسجيل الدخول بنجاح ✅')),
-      );
+      final role = (result['role'] ?? '').toString().toLowerCase();
+      final token = (result['token'] ?? '').toString();
+
+      if (token.isEmpty) {
+        _showSnack('بيانات تسجيل الدخول غير صحيحة ❌');
+        return;
+      }
+
+      _showSnack('تم تسجيل الدخول بنجاح ✅');
 
       // ✅ التوجيه حسب الدور
       if (role == 'doctor') {
@@ -68,9 +77,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('حدث خطأ أثناء تسجيل الدخول')),
-      );
+      // ✅ رسالة أوضح
+      _showSnack('حدث خطأ أثناء تسجيل الدخول ❌');
     }
   }
 
@@ -102,6 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
                   decoration: InputDecoration(
                     labelText: 'البريد الإلكتروني',
                     prefixIcon: const Icon(Icons.email_outlined),
@@ -116,6 +125,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: _passwordController,
                   obscureText: _hidePassword,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _login(), // ✅ Enter يعمل Login
                   decoration: InputDecoration(
                     labelText: 'كلمة المرور',
                     prefixIcon: const Icon(Icons.lock_outline),
@@ -139,8 +150,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () =>
-                        Navigator.pushNamed(context, AppRoutes.forgotPassword),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.pushNamed(
+                              context,
+                              AppRoutes.forgotPassword,
+                            ),
                     child: const Text('هل نسيت كلمة المرور؟'),
                   ),
                 ),
@@ -172,8 +187,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     const Text('ليس لديك حساب؟'),
                     TextButton(
-                      onPressed: () =>
-                          Navigator.pushNamed(context, AppRoutes.signup),
+                      onPressed: _isLoading
+                          ? null
+                          : () => Navigator.pushNamed(context, AppRoutes.signup),
                       child: const Text('إنشاء حساب جديد'),
                     ),
                   ],
