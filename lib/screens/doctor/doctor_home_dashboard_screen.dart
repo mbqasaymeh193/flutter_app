@@ -50,8 +50,9 @@ class _DoctorHomeDashboardScreenState extends State<DoctorHomeDashboardScreen> {
       for (final a in apps) {
         if (a is! Map) continue;
         final status = (a['status'] ?? '').toString().toLowerCase();
-        if (status == 'pending') p++;
-        else if (status == 'confirmed' || status == 'accepted') c++;
+        if (status == 'pending') {
+          p++;
+        } else if (status == 'confirmed' || status == 'accepted') c++;
         else if (status == 'rejected') r++;
 
         final startsAt = _tryParse(a['startsAt']);
@@ -60,7 +61,7 @@ class _DoctorHomeDashboardScreenState extends State<DoctorHomeDashboardScreen> {
           if (day == today) t++;
 
           if (startsAt.isAfter(now)) {
-            if (nextTime == null || startsAt.isBefore(nextTime!)) {
+            if (nextTime == null || startsAt.isBefore(nextTime)) {
               nextTime = startsAt;
               next = Map<String, dynamic>.from(a);
             }

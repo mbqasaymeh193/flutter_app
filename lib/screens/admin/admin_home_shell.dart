@@ -429,6 +429,7 @@ class _AdminDashboardTab extends StatelessWidget {
     final appointments = _int(stats['appointments']);
     final pending = _int(stats['pending']);
     final pendingDoctors = _int(stats['pendingDoctors']);
+    
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -501,6 +502,7 @@ class _AdminDashboardTab extends StatelessWidget {
                 _summaryRow('قيد الانتظار', pending, Colors.orange),
                 _summaryRow('مؤكدة', _int(stats['confirmed']), Colors.green),
                 _summaryRow('مرفوضة', _int(stats['rejected']), Colors.red),
+                
               ],
             ),
           ),
