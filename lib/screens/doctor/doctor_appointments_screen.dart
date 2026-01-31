@@ -101,6 +101,12 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
         ),
       );
     }
+    Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (_) => DoctorPublicProfileScreen(doctor: doctor),
+  ),
+);
 
     return RefreshIndicator(
       onRefresh: _fetchAppointments,

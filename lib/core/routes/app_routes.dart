@@ -48,6 +48,8 @@ static const String register = '/register';
   // ===================== Patient ====================
   static const String patientHomeShell = '/patientHomeShell';
   static const String patientAppointments = '/patientAppointments';
+  static const editDoctorProfile = '/edit-doctor-profile';
+
 
   // ===================== Doctor =====================
   // 0: Dashboard, 1: Appointments, 2: Records, 3: Profile
@@ -56,6 +58,7 @@ static const String register = '/register';
   static const String doctorAppointments = '/doctorAppointments';
   static const String doctorRecords = '/doctorRecords';
   static const String doctorProfile = '/doctorProfile';
+
 
   static const String doctorPatientsScreen = '/doctorPatientsScreen';
 
@@ -67,6 +70,7 @@ static const String register = '/register';
   static const String adminPatients = '/adminPatients';
   static const String adminAppointments = '/adminAppointments';
   static const String adminSettings = '/adminSettings';
+  
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -93,6 +97,10 @@ static const String register = '/register';
 
       case changePassword:
         return MaterialPageRoute(builder: (_) => const ChangePasswordScreen());
+      case editDoctorProfile:
+       return MaterialPageRoute(
+      builder: (_) => const EditDoctorProfileScreen(),
+    );
 
       case registerSuccess: {
         final args = settings.arguments as Map<String, dynamic>?;

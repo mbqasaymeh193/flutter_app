@@ -915,6 +915,38 @@ class ApiService {
 
     return unique.values.toList();
   }
+  static Future<DoctorProfile> getDoctorProfile() async {
+  final res = await http.get(
+    Uri.parse('$baseUrl/doctor/profile'),
+    headers: _authHeaders(),
+  );
+
+  if (res.statusCode == 200) {
+    return DoctorProfile.fromJson(jsonDecode(res.body));
+  } else {
+    throw Exception('Failed to load doctor profile');
+  }
+  }
+  static Future<bool> updateDoctorProfile(Map<String, dynamic> data) async {
+  final res = await http.put(
+    Uri.parse('$baseUrl/doctor/profile'),
+    headers: _authHeaders(),
+    body: jsonEncode(data),
+  );
+
+  return res.statusCode == 200;
+}
+static Future<DoctorProfile> getDoctorDetails(int doctorId) async {
+  final res = await http.get(
+    Uri.parse('$baseUrl/doctors/$doctorId'),
+  );
+
+  if (res.statusCode == 200) {
+    return DoctorProfile.fromJson(jsonDecode(res.body));
+  } else {
+    throw Exception('Doctor not found');
+  }
+}
 
   static Future<List<dynamic>> getDoctorPatients() async {
     await loadToken();

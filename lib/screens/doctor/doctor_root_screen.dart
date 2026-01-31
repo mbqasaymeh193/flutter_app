@@ -19,12 +19,13 @@ class _DoctorRootScreenState extends State<DoctorRootScreen> {
   // badge للإشعارات
   int _unread = 0;
 
-  final _pages = const [
-    DoctorHomeDashboardScreen(),
-    DoctorAppointmentsScreen(),
-    DoctorPatientsRecordsScreen(),
-    DoctorProfileScreen(),
-  ];
+  final List<Widget> _pages = const [
+  DoctorHomeDashboardScreen(),
+  DoctorAppointmentsScreen(),
+  DoctorPatientsRecordsScreen(),
+  DoctorProfileScreen(),
+];
+
 
   final _titles = const [
     'الرئيسية',
