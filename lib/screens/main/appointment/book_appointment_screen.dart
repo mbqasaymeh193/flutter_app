@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../services/api_service.dart';
+import '../../../core/routes/app_routes.dart';
 
 class BookAppointmentScreen extends StatefulWidget {
   /// doctor يمكن أن يكون:
@@ -16,6 +17,10 @@ class BookAppointmentScreen extends StatefulWidget {
 
 class _BookAppointmentScreenState extends State<BookAppointmentScreen>
     with SingleTickerProviderStateMixin {
+  // إذا كان الباك يرسل الوقت بدون timezone لكن بقيم UTC
+  // غيّرها إلى false إن كان الباك يرسل Local فعليًا.
+  static const bool _assumeApiTimesUtc = true;
+
   bool _loading = true;
   bool _loadingSlots = false;
   bool _booking = false;
@@ -100,9 +105,10 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen>
     } catch (_) {
       _doctors = [];
     } finally {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      _fadeController.forward();
+      if (mounted) {
+        setState(() => _loading = false);
+        _fadeController.forward();
+      }
     }
   }
 
@@ -261,21 +267,74 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen>
     setState(() => _booking = true);
 
     try {
+      final apiStartsAt = _toApiDateTime(startsAt);
+      final apiEndsAt = _toApiDateTime(endsAt!);
+
+      final res = await ApiService.bookAppointmentDetailed(
+        doctorId: _selectedDoctorId!,
+        startsAt: apiStartsAt,
+        endsAt: apiEndsAt,
+      );
+
+      if (!mounted) return;
+
+      if (res != null) {
+        final appointmentId = _tryInt(res['appointmentId'] ?? res['id']) ?? 0;
+        final price = _tryDouble(res['price'] ?? res['amount']);
+        final paymentRequired =
+            _tryBool(res['paymentRequired'] ?? res['isPaymentRequired']) ||
+                price > 0;
+
+        if (appointmentId <= 0) {
+          _toast('تم الحجز، لكن رقم الموعد غير متوفر.');
+          Navigator.pop(context, true);
+          return;
+        }
+
+        if (paymentRequired) {
+          final selectedDoctor = _findDoctorById(_selectedDoctorId);
+          final doctorName =
+              (selectedDoctor?['fullName'] ?? selectedDoctor?['name'])?.toString();
+          final specialty = (selectedDoctor?['specialty'] ?? '').toString();
+
+          final paid = await Navigator.pushNamed(
+            context,
+            AppRoutes.payment,
+            arguments: {
+              'appointmentId': appointmentId,
+              'amount': price,
+              'doctorName': doctorName,
+              'specialty': specialty,
+            },
+          );
+
+          if (!mounted) return;
+
+          if (paid == true) {
+            _toast('تم الدفع بنجاح');
+          } else {
+            _toast('تم الحجز ويمكنك الدفع لاحقًا');
+          }
+
+          Navigator.pop(context, true);
+          return;
+        }
+
+        _toast('تم حجز الموعد بنجاح');
+        Navigator.pop(context, true);
+        return;
+      }
+
       final ok = await ApiService.bookAppointment(
         doctorId: _selectedDoctorId!,
-        startsAt: startsAt,
-        endsAt: endsAt!,
+        startsAt: apiStartsAt,
+        endsAt: apiEndsAt,
       );
 
       if (!mounted) return;
 
       if (ok) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ تم حجز الموعد بنجاح'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        _toast('تم حجز الموعد بنجاح');
         Navigator.pop(context, true);
       } else {
         _toast('فشل حجز الموعد');
@@ -301,14 +360,46 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen>
     return int.tryParse(v.toString());
   }
 
+  double _tryDouble(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    return double.tryParse(v.toString()) ?? 0.0;
+  }
+
+  bool _tryBool(dynamic v) {
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    final s = v?.toString().trim().toLowerCase();
+    return s == 'true' || s == '1' || s == 'yes';
+  }
+
+  Map<String, dynamic>? _findDoctorById(int? id) {
+    if (id == null) return null;
+    for (final d in _doctors) {
+      if (_tryInt(d['id']) == id) return d;
+    }
+    return null;
+  }
+
   DateTime? _tryDate(dynamic v) {
     if (v == null) return null;
-    if (v is DateTime) return v;
-    try {
-      return DateTime.parse(v.toString());
-    } catch (_) {
-      return null;
-    }
+    if (v is DateTime) return v.isUtc ? v.toLocal() : v;
+    final s = v.toString().trim();
+    if (s.isEmpty) return null;
+    return _parseApiDate(s);
+  }
+
+  DateTime? _parseApiDate(String s) {
+    final hasOffset = RegExp(r'(Z|[+-]\d{2}:\d{2})$').hasMatch(s);
+    final normalized = (!_assumeApiTimesUtc || hasOffset) ? s : '${s}Z';
+    final parsed = DateTime.tryParse(normalized);
+    if (parsed == null) return null;
+    return parsed.toLocal();
+  }
+
+  DateTime _toApiDateTime(DateTime local) {
+    return _assumeApiTimesUtc ? local.toUtc() : local;
   }
 
   DateTime? _parseSlotStart(Map<String, dynamic> slot) {
@@ -425,7 +516,8 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen>
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: DropdownButtonFormField<int>(
-          value: _selectedDoctorId,
+          key: ValueKey<int?>(_selectedDoctorId),
+          initialValue: _selectedDoctorId,
           decoration: const InputDecoration(
             labelText: 'اختيار الطبيب',
             border: OutlineInputBorder(),

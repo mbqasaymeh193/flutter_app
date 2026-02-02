@@ -187,9 +187,9 @@ class _DoctorAddMedicalRecordScreenState
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.08),
+                    color: Colors.red.withAlpha((0.08 * 255).round()),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.withOpacity(0.25)),
+                    border: Border.all(color: Colors.red.withAlpha((0.25 * 255).round())),
                   ),
                   child: const Text(
                     'لا يمكن إنشاء سجل طبي إلا إذا كان هناك appointmentId صحيح.\n'

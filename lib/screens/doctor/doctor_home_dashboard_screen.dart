@@ -52,8 +52,11 @@ class _DoctorHomeDashboardScreenState extends State<DoctorHomeDashboardScreen> {
         final status = (a['status'] ?? '').toString().toLowerCase();
         if (status == 'pending') {
           p++;
-        } else if (status == 'confirmed' || status == 'accepted') c++;
-        else if (status == 'rejected') r++;
+        } else if (status == 'confirmed' || status == 'accepted') {
+          c++;
+        } else if (status == 'rejected') {
+          r++;
+        }
 
         final startsAt = _tryParse(a['startsAt']);
         if (startsAt != null) {

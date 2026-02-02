@@ -113,7 +113,7 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
       final allAppointments = await ApiService.getDoctorAppointments();
       final pid = _patientId?.toString();
 
-      final filtered = (allAppointments ?? [])
+      final filtered = allAppointments
           .where((a) =>
               a is Map &&
               (a['patient']?['id']?.toString() == pid ||
@@ -314,7 +314,7 @@ class _DoctorPatientDetailsScreenState extends State<DoctorPatientDetailsScreen>
                             if (!mounted) return;
 
                             if (ok) {
-                              Navigator.pop(ctx);
+                              Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text('تم حفظ التقرير الطبي بنجاح ✅'),

@@ -23,6 +23,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     setState(() => _isLoading = true);
     final success = await ApiService.changePassword(oldPass, newPass);
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
     if (success) {

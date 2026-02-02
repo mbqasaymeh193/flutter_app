@@ -32,7 +32,7 @@ class _DoctorConfirmAppointmentsScreenState
     try {
       final data = await ApiService.getDoctorAppointments();
       setState(() {
-        _appointments = (data ?? []);
+        _appointments = data;
       });
     } catch (e) {
       setState(() {
@@ -212,7 +212,7 @@ class _DoctorConfirmAppointmentsScreenState
                                         ),
                                         decoration: BoxDecoration(
                                           color: _statusColor(status)
-                                              .withOpacity(0.1),
+                                              .withAlpha((0.1 * 255).round()),
                                           borderRadius:
                                               BorderRadius.circular(8),
                                         ),

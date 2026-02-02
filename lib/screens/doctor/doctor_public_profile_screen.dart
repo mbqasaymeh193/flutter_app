@@ -14,11 +14,11 @@ class DoctorPublicProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String specialty = _safe(doctor.specialty);
-    final String education = _safe(doctor.education);
-    final String clinicName = _safe(doctor.clinicName);
+    final String university = _safe(doctor.university);
+    final String qualification = _safe(doctor.qualification);
     final String clinicAddress = _safe(doctor.clinicAddress);
     final String bio = _safe(doctor.bio);
-    final int years = _safeInt(doctor.yearsOfExperience);
+    final int years = _safeInt(doctor.experienceYears);
 
     // مهم جداً:
     // في الـ Backend endpoint /api/doctors يرجع d.Id (DoctorId)
@@ -41,9 +41,9 @@ class DoctorPublicProfileScreen extends StatelessWidget {
           const Divider(height: 32),
 
           _infoRow(Icons.work_outline, 'التخصص', specialty),
-          _infoRow(Icons.school_outlined, 'الدراسة', education),
+          _infoRow(Icons.school_outlined, 'الجامعة', university),
+          _infoRow(Icons.workspace_premium_outlined, 'المؤهل', qualification),
           _infoRow(Icons.timeline_outlined, 'سنوات الخبرة', '$years سنة'),
-          _infoRow(Icons.local_hospital_outlined, 'العيادة', clinicName),
           _infoRow(Icons.location_on_outlined, 'الموقع', clinicAddress),
 
           const SizedBox(height: 20),
@@ -86,7 +86,6 @@ class DoctorPublicProfileScreen extends StatelessWidget {
                     'specialty': specialty,
 
                     // اختيارياً (قد تستفيد منها UI)
-                    'clinicName': clinicName,
                     'clinicAddress': clinicAddress,
                   },
                 );
@@ -161,20 +160,6 @@ class DoctorPublicProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _stars(double value) {
-    final int full = value.floor();
-
-    return Row(
-      children: List.generate(5, (i) {
-        return Icon(
-          i < full ? Icons.star : Icons.star_border,
-          color: Colors.amber,
-          size: 20,
-        );
-      }),
-    );
-  }
-
   Widget _infoRow(IconData icon, String title, String value) {
     final String v = value.trim().isEmpty ? 'غير متوفر' : value.trim();
 
@@ -224,6 +209,14 @@ class DoctorPublicProfileScreen extends StatelessWidget {
   // لو لا، نستخدم userId كحل مؤقت حتى نصلّح الموديل/التحويل
   int _resolveDoctorId() {
     // 1) أفضل خيار
+    try {
+      // إذا الموديل فيه doctorId
+      final int did = _safeInt(doctor.doctorId);
+      if (did > 0) return did;
+    } catch (_) {
+      // تجاهل
+    }
+
     try {
       // إذا الموديل فيه id
       final dynamic maybeId = (doctor as dynamic).id;

@@ -19,6 +19,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     setState(() => _processing = true);
     try {
       final ok = await ApiService.cancelAppointment(id);
+      if (!mounted) return;
       if (ok == true) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Appointment cancelled')));
         Navigator.pop(context, true);
@@ -26,6 +27,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to cancel')));
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
     } finally {
       if (mounted) setState(() => _processing = false);

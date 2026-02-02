@@ -186,7 +186,7 @@ class _MyAppointmentsScreenState extends State<MyAppointmentsScreen> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: _statusColor(status)
-                                          .withOpacity(0.12),
+                                          .withAlpha((0.12 * 255).round()),
                                       borderRadius: BorderRadius.circular(999),
                                     ),
                                     child: Text(

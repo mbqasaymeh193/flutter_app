@@ -41,6 +41,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     final success = await ApiService.changePassword(oldPass, newPass);
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
     if (success) {

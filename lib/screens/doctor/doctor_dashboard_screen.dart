@@ -30,12 +30,11 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
       final appointments = await ApiService.getDoctorAppointments();
 
       setState(() {
-        totalAppointments = (appointments ?? []).length;
+        totalAppointments = appointments.length;
         _loading = false;
       });
 
-      debugPrint(
-          "📊 DoctorDashboard: loaded ${appointments.length ?? 0} appointments");
+      debugPrint("📊 DoctorDashboard: loaded ${appointments.length} appointments");
     } catch (e) {
       debugPrint("DoctorDashboard _loadAppointments error: $e");
       setState(() {

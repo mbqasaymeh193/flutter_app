@@ -77,7 +77,7 @@ class _HomePatientScreenState extends State<HomePatientScreen> {
                         borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withAlpha((0.04 * 255).round()),
                             blurRadius: 8,
                             offset: const Offset(0, 3),
                           ),

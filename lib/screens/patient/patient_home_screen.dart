@@ -84,7 +84,7 @@ class _HomePatientScreenState extends State<HomePatientScreen> {
       final data = await ApiService.getDoctors();
       setState(() => doctors = data);
     } catch (e) {
-      print("🔴 Error fetching doctors: $e");
+      debugPrint("🔴 Error fetching doctors: $e");
     } finally {
       setState(() => _loading = false);
     }

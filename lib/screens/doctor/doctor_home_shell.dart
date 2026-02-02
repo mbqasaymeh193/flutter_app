@@ -536,6 +536,13 @@ class _ProfileTab extends StatelessWidget {
           child: Column(
             children: [
               ListTile(
+                leading: const Icon(Icons.schedule),
+                title: const Text('ساعات الدوام'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.pushNamed(context, AppRoutes.doctorWorkingHours),
+              ),
+              const Divider(height: 0),
+              ListTile(
                 leading: const Icon(Icons.lock_outline),
                 title: const Text('تغيير كلمة المرور'),
                 trailing: const Icon(Icons.chevron_right),

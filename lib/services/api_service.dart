@@ -606,6 +606,42 @@ class ApiService {
     }
   }
 
+  /// ✅ PUT /api/appointments/{id}/status (تفصيلي)
+  /// يرجّع statusCode + message إن وُجدت.
+  static Future<Map<String, dynamic>?> updateAppointmentStatusDetailed({
+    required int appointmentId,
+    required String status,
+  }) async {
+    await loadToken();
+    if (token == null) return null;
+
+    if (appointmentId <= 0) return null;
+
+    try {
+      final res = await _put(
+        "/appointments/$appointmentId/status",
+        withAuth: true,
+        body: {"status": status},
+      );
+
+      final data = _tryDecode(res.body);
+      final map = <String, dynamic>{
+        "statusCode": res.statusCode,
+        "ok": res.statusCode == 200 || res.statusCode == 204,
+      };
+
+      if (data is Map) {
+        map.addAll(Map<String, dynamic>.from(data));
+      } else if (data != null) {
+        map["message"] = data.toString();
+      }
+
+      return map;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ================= Wallet =================
 
   /// ✅ GET /api/wallet/mine

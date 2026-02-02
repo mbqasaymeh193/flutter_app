@@ -24,7 +24,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
 
     setState(() => _isLoading = true);
-    final result = await ApiService.forgotPassword(email);
+    await ApiService.forgotPassword(email);
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -35,7 +36,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ),
     );
     Navigator.pushNamed(context, AppRoutes.resetPassword);
-    }
+  }
 
   @override
   Widget build(BuildContext context) {

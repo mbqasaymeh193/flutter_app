@@ -357,7 +357,7 @@ class _AdminHomeShellState extends State<AdminHomeShell> {
                   statusColor: _statusColor,
                   onChangeStatus: (id, status) async {
                     final ok = await ApiService.updateAppointmentStatus(id, status);
-                    if (!mounted) return;
+                    if (!context.mounted) return;
 
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(ok ? 'تم تحديث حالة الموعد ✅' : 'تعذّر تحديث حالة الموعد')),
@@ -422,13 +422,13 @@ class _AdminDashboardTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateFormat('y/MM/dd • HH:mm').format(DateTime.now());
 
-    int _int(dynamic v) => int.tryParse((v ?? 0).toString()) ?? 0;
+    int toInt(dynamic v) => int.tryParse((v ?? 0).toString()) ?? 0;
 
-    final doctors = _int(stats['doctors']);
-    final patients = _int(stats['patients']);
-    final appointments = _int(stats['appointments']);
-    final pending = _int(stats['pending']);
-    final pendingDoctors = _int(stats['pendingDoctors']);
+    final doctors = toInt(stats['doctors']);
+    final patients = toInt(stats['patients']);
+    final appointments = toInt(stats['appointments']);
+    final pending = toInt(stats['pending']);
+    final pendingDoctors = toInt(stats['pendingDoctors']);
     
 
     return ListView(
@@ -500,8 +500,8 @@ class _AdminDashboardTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 _summaryRow('قيد الانتظار', pending, Colors.orange),
-                _summaryRow('مؤكدة', _int(stats['confirmed']), Colors.green),
-                _summaryRow('مرفوضة', _int(stats['rejected']), Colors.red),
+                _summaryRow('مؤكدة', toInt(stats['confirmed']), Colors.green),
+                _summaryRow('مرفوضة', toInt(stats['rejected']), Colors.red),
                 
               ],
             ),
@@ -521,7 +521,7 @@ class _AdminDashboardTab extends StatelessWidget {
             child: LinearProgressIndicator(
               value: v,
               color: color,
-              backgroundColor: color.withOpacity(0.15),
+              backgroundColor: color.withAlpha((0.15 * 255).round()),
               minHeight: 8,
               borderRadius: BorderRadius.circular(8),
             ),
@@ -554,10 +554,10 @@ class _StatCard extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
-      splashColor: color.withOpacity(0.2),
+      splashColor: color.withAlpha((0.2 * 255).round()),
       child: Card(
         elevation: 2,
-        color: color.withOpacity(0.1),
+        color: color.withAlpha((0.1 * 255).round()),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -568,7 +568,14 @@ class _StatCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: color)),
               const SizedBox(height: 4),
-              Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: color.withOpacity(0.85))),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: color.withAlpha((0.85 * 255).round()),
+                ),
+              ),
             ],
           ),
         ),
@@ -699,7 +706,7 @@ class _AdminUsersTab extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: active ? const Color(0x221565C0) : Colors.grey.withOpacity(0.2),
+              backgroundColor: active ? const Color(0x221565C0) : Colors.grey.withAlpha((0.2 * 255).round()),
               child: Icon(Icons.person, color: active ? const Color(0xFF1565C0) : Colors.grey),
             ),
             title: Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),

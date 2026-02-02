@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 // Doctor
 import 'package:healthcare_flutter_app/screens/doctor/doctor_home_shell.dart';
 import 'package:healthcare_flutter_app/screens/doctor/doctor_patients_screen.dart';
+import 'package:healthcare_flutter_app/screens/doctor/doctor_working_hours_screen.dart';
 
 // ✅ لازم يكون عندك هذا الملف (عدّل المسار إذا مختلف)
 import 'package:healthcare_flutter_app/screens/doctor/edit_doctor_profile_screen.dart';
@@ -22,6 +23,7 @@ import 'package:healthcare_flutter_app/screens/auth/auth_gate_screen.dart';
 import 'package:healthcare_flutter_app/screens/patient/patient_home_shell.dart';
 import 'package:healthcare_flutter_app/screens/patient/patient_appointments_screen.dart';
 import 'package:healthcare_flutter_app/screens/admin/admin_home_shell.dart';
+import 'package:healthcare_flutter_app/screens/payment_screen.dart';
 
 // ✅ Book Appointment Screen (عدّل المسار إذا مختلف)
 import 'package:healthcare_flutter_app/screens/main/appointment/book_appointment_screen.dart';
@@ -53,6 +55,7 @@ class AppRoutes {
   // ===================== Patient ====================
   static const String patientHomeShell = '/patientHomeShell';
   static const String patientAppointments = '/patientAppointments';
+  static const String payment = '/payment';
 
   // ✅ Route جديد للحجز (كان ناقص)
   static const String bookAppointment = '/bookAppointment';
@@ -69,6 +72,7 @@ class AppRoutes {
   static const String doctorProfile = '/doctorProfile';
   static const String doctorAddMedicalRecord = '/doctor/add-medical-record';
   static const String doctorPatientsScreen = '/doctorPatientsScreen';
+  static const String doctorWorkingHours = '/doctorWorkingHours';
 
   // ===================== Admin ======================
   // 0: Dashboard, 1: Doctors approvals, 2: Patients, 3: Appointments, 4: Settings
@@ -133,6 +137,24 @@ class AppRoutes {
       case patientAppointments:
         return MaterialPageRoute(builder: (_) => const PatientAppointmentsScreen());
 
+      case payment: {
+        final args = settings.arguments as Map<String, dynamic>?;
+        final rawId = args?['appointmentId'] ?? args?['id'];
+        final appointmentId = int.tryParse(rawId?.toString() ?? '') ?? 0;
+
+        final rawAmount = args?['amount'] ?? args?['price'];
+        final amount = double.tryParse(rawAmount?.toString() ?? '') ?? 0.0;
+
+        return MaterialPageRoute(
+          builder: (_) => PaymentScreen(
+            appointmentId: appointmentId,
+            amount: amount,
+            doctorName: args?['doctorName']?.toString(),
+            specialty: args?['specialty']?.toString(),
+          ),
+        );
+      }
+
       // ✅ Book Appointment Route
       case bookAppointment: {
         final args = settings.arguments as Map<String, dynamic>?;
@@ -163,6 +185,9 @@ class AppRoutes {
 
       case doctorPatientsScreen:
         return MaterialPageRoute(builder: (_) => const DoctorPatientsScreen());
+
+      case doctorWorkingHours:
+        return MaterialPageRoute(builder: (_) => const DoctorWorkingHoursScreen());
 
       // ---------- Admin Shell ----------
       case adminHomeShell: {

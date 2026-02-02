@@ -1,488 +1,314 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
 class PaymentScreen extends StatefulWidget {
-  const PaymentScreen({super.key});
+  final int appointmentId;
+  final double amount;
+  final String? doctorName;
+  final String? specialty;
+
+  const PaymentScreen({
+    super.key,
+    required this.appointmentId,
+    required this.amount,
+    this.doctorName,
+    this.specialty,
+  });
 
   @override
   State<PaymentScreen> createState() => _PaymentScreenState();
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
-  String _selectedPaymentMethod = 'card';
+  String _method = 'wallet';
+  bool _loading = false;
+  bool _walletLoading = true;
+  double _walletBalance = 0.0;
+  double _walletOnHold = 0.0;
+
+  final TextEditingController _cardName = TextEditingController();
+  final TextEditingController _cardNumber = TextEditingController();
+  final TextEditingController _cardExp = TextEditingController();
+  final TextEditingController _cardCvv = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWallet();
+  }
+
+  @override
+  void dispose() {
+    _cardName.dispose();
+    _cardNumber.dispose();
+    _cardExp.dispose();
+    _cardCvv.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadWallet() async {
+    setState(() => _walletLoading = true);
+
+    final data = await ApiService.getMyWallet();
+    if (!mounted) return;
+
+    final map = data ?? <String, dynamic>{};
+    _walletBalance = _toDouble(map['balance']);
+    _walletOnHold = _toDouble(map['onHold']);
+
+    setState(() => _walletLoading = false);
+  }
+
+  double _walletAvailable() {
+    final v = _walletBalance - _walletOnHold;
+    return v < 0 ? 0.0 : v;
+  }
+
+  double _toDouble(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    return double.tryParse(v.toString()) ?? 0.0;
+  }
+
+  Future<void> _pay() async {
+    if (_loading) return;
+
+    if (widget.appointmentId <= 0) {
+      _snack('Invalid appointment.');
+      return;
+    }
+
+    if (_method == 'wallet' && _walletAvailable() < widget.amount) {
+      _snack('رصيد المحفظة غير كافٍ.');
+      return;
+    }
+
+    if (_method == 'card') {
+      if (_cardName.text.trim().isEmpty ||
+          _cardNumber.text.trim().isEmpty ||
+          _cardExp.text.trim().isEmpty ||
+          _cardCvv.text.trim().isEmpty) {
+        _snack('Please fill all card fields.');
+        return;
+      }
+    }
+
+    setState(() => _loading = true);
+
+    final res = await ApiService.checkoutPayment(
+      appointmentId: widget.appointmentId,
+      method: _method,
+      cardName: _method == 'card' ? _cardName.text.trim() : null,
+      cardNumber: _method == 'card' ? _cardNumber.text.trim() : null,
+      cardExp: _method == 'card' ? _cardExp.text.trim() : null,
+      cardCvv: _method == 'card' ? _cardCvv.text.trim() : null,
+    );
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (res == null) {
+      _snack('Payment failed. Please try again.');
+      return;
+    }
+
+    final code = res['statusCode'];
+    final ok = (code is int && (code == 200 || code == 201)) ||
+        res['ok'] == true ||
+        res['success'] == true;
+    final msg = (res['message'] ??
+            (ok ? 'Payment processed.' : 'Payment failed.'))
+        .toString();
+
+    _snack(msg);
+
+    if (ok) {
+      Navigator.pop(context, true);
+    }
+  }
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final amountText = widget.amount.toStringAsFixed(2);
+    final availableText = _walletAvailable().toStringAsFixed(2);
+    final insufficientWallet = _method == 'wallet' && _walletAvailable() < widget.amount;
+    final payLabel = _method == 'wallet' ? 'ادفع الآن (محفظة)' : 'ادفع الآن (بطاقة)';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Payment Methods'),
+        title: const Text('الدفع'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadWallet,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Select Payment Method',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Credit/Debit Card
-            _buildPaymentOption(
-              'card',
-              'Credit/Debit Card',
-              'Pay with your card',
-              Icons.credit_card,
-              Colors.blue,
-            ),
-            const SizedBox(height: 12),
-            // PayPal
-            _buildPaymentOption(
-              'paypal',
-              'PayPal',
-              'Pay with PayPal account',
-              Icons.account_balance_wallet,
-              Colors.indigo,
-            ),
-            const SizedBox(height: 12),
-            // Apple Pay
-            _buildPaymentOption(
-              'apple',
-              'Apple Pay',
-              'Pay with Apple Pay',
-              Icons.apple,
-              Colors.black,
-            ),
-            const SizedBox(height: 12),
-            // Google Pay
-            _buildPaymentOption(
-              'google',
-              'Google Pay',
-              'Pay with Google Pay',
-              Icons.g_mobiledata,
-              Colors.red,
-            ),
-            const SizedBox(height: 12),
-            // Cash
-            _buildPaymentOption(
-              'cash',
-              'Cash',
-              'Pay with cash on arrival',
-              Icons.money,
-              Colors.green,
-            ),
-            const SizedBox(height: 32),
-            // Saved Cards
-            const Text(
-              'Saved Cards',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Appointment Payment',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text('رقم الموعد: ${widget.appointmentId}'),
+                    if ((widget.doctorName ?? '').trim().isNotEmpty)
+                      Text('Doctor: ${widget.doctorName}'),
+                    if ((widget.specialty ?? '').trim().isNotEmpty)
+                      Text('Specialty: ${widget.specialty}'),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Amount: $amountText',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 16),
-            _buildSavedCard(
-              'Visa',
-              '**** **** **** 1234',
-              '12/25',
-              Colors.blue,
+            Card(
+              elevation: 1,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: _walletLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'المحفظة',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 6),
+                          Text('الرصيد: ${_walletBalance.toStringAsFixed(2)}'),
+                          Text('معلّق: ${_walletOnHold.toStringAsFixed(2)}'),
+                          Text(
+                            'متاح: $availableText',
+                            style: TextStyle(
+                              color: insufficientWallet ? Colors.red : Colors.black87,
+                              fontWeight: insufficientWallet ? FontWeight.w700 : FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
             ),
-            const SizedBox(height: 12),
-            _buildSavedCard(
-              'Mastercard',
-              '**** **** **** 5678',
-              '08/24',
-              Colors.orange,
+            const SizedBox(height: 16),
+            const Text(
+              'اختر طريقة الدفع',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 24),
-            // Add New Card Button
-            OutlinedButton.icon(
-              onPressed: () {
-                _showAddCardDialog();
+            const SizedBox(height: 8),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(
+                  value: 'wallet',
+                  label: Text('المحفظة'),
+                  icon: Icon(Icons.account_balance_wallet),
+                ),
+                ButtonSegment(
+                  value: 'card',
+                  label: Text('بطاقة (Visa Demo)'),
+                  icon: Icon(Icons.credit_card),
+                ),
+              ],
+              selected: {_method},
+              onSelectionChanged: (value) {
+                setState(() => _method = value.first);
               },
-              icon: const Icon(Icons.add),
-              label: const Text('Add New Card'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
             ),
-            const SizedBox(height: 32),
-            // Payment Summary (Example)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Column(
-                children: [
-                  _buildSummaryRow('Consultation Fee', '\$50.00'),
-                  const SizedBox(height: 8),
-                  _buildSummaryRow('Service Charge', '\$5.00'),
-                  const SizedBox(height: 8),
-                  _buildSummaryRow('Tax', '\$2.50'),
-                  const Divider(height: 24),
-                  _buildSummaryRow(
-                    'Total',
-                    '\$57.50',
-                    isBold: true,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            // Pay Button
-            ElevatedButton(
-              onPressed: () {
-                _showPaymentConfirmation();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1E88E5),
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Proceed to Pay',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentOption(
-    String value,
-    String title,
-    String subtitle,
-    IconData icon,
-    Color color,
-  ) {
-    final isSelected = _selectedPaymentMethod == value;
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedPaymentMethod = value;
-        });
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? color : Colors.grey[300]!,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 28),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Radio<String>(
-              value: value,
-              groupValue: _selectedPaymentMethod,
-              onChanged: (value) {
-                setState(() {
-                  _selectedPaymentMethod = value!;
-                });
-              },
-              activeColor: color,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSavedCard(String type, String number, String expiry, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color, color.withOpacity(0.7)],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                type,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.more_vert, color: Colors.white),
-                onPressed: () {},
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Text(
-            number,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              letterSpacing: 2,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'EXPIRES',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
-                      fontSize: 10,
-                    ),
-                  ),
-                  Text(
-                    expiry,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
-              ),
-              const Icon(Icons.credit_card, color: Colors.white, size: 32),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryRow(String label, String value, {bool isBold = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showAddCardDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Card'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+            const SizedBox(height: 8),
+            if (_method == 'card') ...[
               TextField(
-                decoration: InputDecoration(
-                  labelText: 'Card Number',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                controller: _cardName,
+                decoration: const InputDecoration(
+                  labelText: 'اسم صاحب البطاقة',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _cardNumber,
+                decoration: const InputDecoration(
+                  labelText: 'رقم البطاقة',
+                  border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
               ),
-              const SizedBox(height: 12),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Cardholder Name',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
                     child: TextField(
-                      decoration: InputDecoration(
+                      controller: _cardExp,
+                      decoration: const InputDecoration(
                         labelText: 'MM/YY',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                        border: OutlineInputBorder(),
                       ),
+                      keyboardType: TextInputType.number,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
-                      decoration: InputDecoration(
+                      controller: _cardCvv,
+                      decoration: const InputDecoration(
                         labelText: 'CVV',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                        border: OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.number,
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              const Text(
+                'قاعدة الديمو: إذا أي حقل = "0" يفشل الدفع.',
+                style: TextStyle(fontSize: 12, color: Colors.black54),
+              ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Card added successfully')),
-              );
-            },
-            child: const Text('Add Card'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showPaymentConfirmation() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Payment'),
-        content: const Text('Are you sure you want to proceed with the payment of \$57.50?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _showSuccessDialog();
-            },
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: Colors.green,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.check,
-                size: 60,
-                color: Colors.white,
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _loading || insufficientWallet ? null : _pay,
+                child: _loading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(payLabel),
               ),
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'Payment Successful!',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+            if (insufficientWallet) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'رصيد المحفظة غير كافٍ لإتمام الدفع.',
+                style: TextStyle(color: Colors.red),
               ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Your appointment has been confirmed',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
+            ],
           ],
         ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 45),
-            ),
-            child: const Text('Done'),
-          ),
-        ],
       ),
     );
   }

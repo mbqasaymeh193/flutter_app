@@ -12,6 +12,7 @@ class AdminSettingsScreen extends StatelessWidget {
         child: ElevatedButton(
           onPressed: () async {
             await ApiService.logout();
+            if (!context.mounted) return;
             Navigator.pushReplacementNamed(context, '/login');
           },
           child: const Text('Logout'),

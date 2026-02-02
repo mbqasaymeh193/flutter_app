@@ -28,9 +28,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     setState(() => _isLoading = true);
     final result = await ApiService.resetPassword(email, newPassword);
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
-    if (result == true || result != null) {
+    if (result) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تمت إعادة تعيين كلمة المرور بنجاح ✅')),
       );

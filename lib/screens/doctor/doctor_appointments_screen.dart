@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import '../../services/api_service.dart';
 
 // ✅ جاهزين لاستخدام routes لاحقاً
-import '../../core/routes/app_routes.dart';
 
 class DoctorAppointmentsScreen extends StatefulWidget {
   const DoctorAppointmentsScreen({super.key});
@@ -73,12 +72,34 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
 
   String _safeStr(dynamic v) => (v ?? '').toString().trim();
 
+  DateTime? _parseApiDate(String s) {
+    final hasOffset = RegExp(r'(Z|[+-]\d{2}:\d{2})$').hasMatch(s);
+    final normalized = hasOffset ? s : '${s}Z';
+    final parsed = DateTime.tryParse(normalized);
+    if (parsed == null) return null;
+    return parsed.toLocal();
+  }
+
+  double _safeDouble(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    return double.tryParse(v.toString()) ?? 0.0;
+  }
+
+  bool _safeBool(dynamic v) {
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    final s = v?.toString().trim().toLowerCase();
+    return s == 'true' || s == '1' || s == 'yes';
+  }
+
   String _formatDateTime(dynamic isoString) {
     final s = _safeStr(isoString);
     if (s.isEmpty) return 'غير معروف';
-    final dt = DateTime.tryParse(s);
+    final dt = _parseApiDate(s);
     if (dt == null) return s;
-    return DateFormat('y/MM/dd • HH:mm').format(dt.toLocal());
+    return DateFormat('y/MM/dd • HH:mm').format(dt);
   }
 
   void _snack(String msg) {
@@ -86,14 +107,6 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
   }
 
   // ====================== Status (Text + Code) ======================
-
-  int _statusToCode(String statusText) {
-    final s = statusText.toLowerCase().trim();
-    if (s == 'pending') return 0;
-    if (s == 'confirmed' || s == 'accepted') return 1;
-    if (s == 'rejected') return 2;
-    return 0;
-  }
 
   String _normalizeStatusText(String s) {
     final lower = s.toLowerCase();
@@ -177,38 +190,80 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
     return Colors.grey;
   }
 
+  String _extractPaymentStatus(Map appointment) {
+    final direct = _safeStr(appointment['paymentStatus']);
+    if (direct.isNotEmpty) return direct;
+    final payment = appointment['payment'];
+    if (payment is Map) {
+      final s = _safeStr(payment['status'] ?? payment['paymentStatus']);
+      if (s.isNotEmpty) return s;
+    }
+    return '';
+  }
+
+  bool _isPaymentAuthorized(String status) {
+    final s = status.toLowerCase();
+    return s == 'authorized' || s == 'captured';
+  }
+
+  bool _isPaymentRequired(Map appointment, double price) {
+    final v = appointment['isPaymentRequired'] ?? appointment['paymentRequired'];
+    if (_safeBool(v)) return true;
+    return price > 0;
+  }
+
   // ====================== Update Status (No Compile Type Errors) ======================
 
-  Future<bool> _callUpdateAppointmentStatus({
+  Future<_UpdateResult> _callUpdateAppointmentStatus({
     required int appointmentId,
     required String statusText,
   }) async {
-    // ✅ نستخدم Function.apply حتى لا يهمنا هل ApiService يستقبل String أو int
-    final dynamic fn = ApiService.updateAppointmentStatus;
+    final normalized = _normalizeStatusText(statusText);
+    final res = await ApiService.updateAppointmentStatusDetailed(
+      appointmentId: appointmentId,
+      status: normalized,
+    );
 
-    // 1) جرّب إرسال String (المعيار الصحيح حسب Swagger)
-    try {
-      final String normalized = _normalizeStatusText(statusText);
-      final dynamic r = await Function.apply(fn, [appointmentId, normalized]);
-      return r == true;
-    } catch (_) {
-      // 2) إذا ApiService يتوقع int، جرّب إرسال code
-      try {
-        final int code = _statusToCode(statusText);
-        final dynamic r2 = await Function.apply(fn, [appointmentId, code]);
-        return r2 == true;
-      } catch (_) {
-        return false;
-      }
+    if (res == null) {
+      final fallback = await ApiService.updateAppointmentStatus(
+        appointmentId,
+        normalized,
+      );
+      return _UpdateResult(
+        fallback == true,
+        fallback == true ? '' : 'فشل في تحديث حالة الموعد',
+      );
     }
+
+    final ok = res['ok'] == true ||
+        res['statusCode'] == 200 ||
+        res['statusCode'] == 204;
+    final msg = (res['message'] ??
+            res['error'] ??
+            res['title'] ??
+            res['detail'])
+        ?.toString();
+    return _UpdateResult(ok, msg ?? '');
   }
 
-  Future<void> _updateStatus(dynamic appointmentIdRaw, String statusText) async {
+  Future<void> _updateStatus(
+    dynamic appointmentIdRaw,
+    String statusText, {
+    required bool paymentRequired,
+    required String paymentStatus,
+  }) async {
     if (_updatingAppointmentId != null) return;
 
     final int appointmentId = _safeInt(appointmentIdRaw);
     if (appointmentId <= 0) {
       _snack('رقم الموعد غير صحيح');
+      return;
+    }
+
+    if (statusText.toLowerCase() == 'confirmed' &&
+        paymentRequired &&
+        !_isPaymentAuthorized(paymentStatus)) {
+      _snack('لا يمكن تأكيد الموعد قبل الدفع المفوّض.');
       return;
     }
 
@@ -239,14 +294,14 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
     setState(() => _updatingAppointmentId = appointmentId);
 
     try {
-      final success = await _callUpdateAppointmentStatus(
+      final result = await _callUpdateAppointmentStatus(
         appointmentId: appointmentId,
         statusText: statusText,
       );
 
       if (!mounted) return;
 
-      if (success) {
+      if (result.ok) {
         _snack(
           statusText.toLowerCase() == 'confirmed'
               ? 'تم تأكيد الموعد ✅'
@@ -254,7 +309,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
         );
         await _fetchAppointments();
       } else {
-        _snack('فشل في تحديث حالة الموعد');
+        _snack(result.message.isNotEmpty ? result.message : 'فشل في تحديث حالة الموعد');
       }
     } catch (_) {
       if (!mounted) return;
@@ -361,8 +416,10 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
           final startsAtText = _formatDateTime(appointment['startsAt']);
 
           final statusText = _statusFromAny(appointment['status']);
-          final paymentStatus = appointment['paymentStatus'];
+          final paymentStatus = _extractPaymentStatus(appointment);
+          final priceValue = _safeDouble(appointment['price']);
           final priceText = _safeStr(appointment['price']);
+          final paymentRequired = _isPaymentRequired(appointment, priceValue);
 
           final appointmentId = _safeInt(appointment['id']);
           final bool canChangeStatus = _isPendingAny(appointment['status']);
@@ -392,7 +449,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: _paymentColor(paymentStatus).withOpacity(0.15),
+                          color: _paymentColor(paymentStatus).withAlpha((0.15 * 255).round()),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -430,7 +487,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     margin: const EdgeInsets.only(right: 8),
                     decoration: BoxDecoration(
-                      color: _statusColor(statusText).withOpacity(0.15),
+                      color: _statusColor(statusText).withAlpha((0.15 * 255).round()),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -452,13 +509,23 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                     IconButton(
                       icon: const Icon(Icons.check, color: Colors.green),
                       onPressed: (canChangeStatus && appointmentId > 0)
-                          ? () => _updateStatus(appointmentId, 'confirmed')
+                          ? () => _updateStatus(
+                                appointmentId,
+                                'confirmed',
+                                paymentRequired: paymentRequired,
+                                paymentStatus: paymentStatus,
+                              )
                           : null,
                     ),
                     IconButton(
                       icon: const Icon(Icons.close, color: Colors.red),
                       onPressed: (canChangeStatus && appointmentId > 0)
-                          ? () => _updateStatus(appointmentId, 'rejected')
+                          ? () => _updateStatus(
+                                appointmentId,
+                                'rejected',
+                                paymentRequired: paymentRequired,
+                                paymentStatus: paymentStatus,
+                              )
                           : null,
                     ),
                   ],
@@ -470,4 +537,11 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
       ),
     );
   }
+}
+
+class _UpdateResult {
+  final bool ok;
+  final String message;
+
+  const _UpdateResult(this.ok, this.message);
 }

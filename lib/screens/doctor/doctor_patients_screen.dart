@@ -28,7 +28,7 @@ class _DoctorPatientsScreenState extends State<DoctorPatientsScreen> {
     setState(() => _loading = true);
     try {
       // 🩺 نحصل على مواعيد الدكتور من الـ API
-      final appointments = await ApiService.getDoctorAppointments() ?? [];
+      final appointments = await ApiService.getDoctorAppointments();
 
       final Map<String, Map<String, dynamic>> uniquePatients = {};
 
@@ -350,9 +350,8 @@ class _DoctorPatientsScreenState extends State<DoctorPatientsScreen> {
                                                       vertical: 4,
                                                     ),
                                                     decoration: BoxDecoration(
-                                                      color: _statusColor(
-                                                              status)
-                                                          .withOpacity(0.12),
+                                                      color: _statusColor(status)
+                                                          .withAlpha((0.12 * 255).round()),
                                                       borderRadius:
                                                           BorderRadius
                                                               .circular(
@@ -379,10 +378,8 @@ class _DoctorPatientsScreenState extends State<DoctorPatientsScreen> {
                                                       vertical: 4,
                                                     ),
                                                     decoration: BoxDecoration(
-                                                      color: Colors
-                                                          .blueGrey
-                                                          .withOpacity(
-                                                              0.06),
+                                                      color: Colors.blueGrey
+                                                          .withAlpha((0.06 * 255).round()),
                                                       borderRadius:
                                                           BorderRadius
                                                               .circular(

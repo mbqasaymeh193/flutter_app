@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:healthcare_flutter_app/services/api_service.dart';
 import 'package:healthcare_flutter_app/utils/nav.dart';
 import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
+import 'package:healthcare_flutter_app/widgets/notification_bell.dart';
+import 'patient_appointments_screen.dart';
 import '../main/appointment/book_appointment_screen.dart';
 
 class PatientHomeShell extends StatefulWidget {
@@ -16,20 +17,17 @@ class _PatientHomeShellState extends State<PatientHomeShell>
     with TickerProviderStateMixin {
   int _currentIndex = 0;
   late final PageController _pageController;
+  int _appointmentsReload = 0;
 
   // بيانات الأطباء والمواعيد
   bool _loadingDoctors = true;
   List<dynamic> _doctors = [];
-
-  bool _loadingAppointments = true;
-  List<dynamic> _appointments = [];
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController(keepPage: true);
     _loadDoctors();
-    _loadAppointments();
   }
 
   // 📋 تحميل الأطباء
@@ -42,19 +40,6 @@ class _PatientHomeShellState extends State<PatientHomeShell>
       setState(() => _doctors = []);
     } finally {
       setState(() => _loadingDoctors = false);
-    }
-  }
-
-  // 📅 تحميل المواعيد
-  Future<void> _loadAppointments() async {
-    setState(() => _loadingAppointments = true);
-    try {
-      final data = await ApiService.getMyAppointments();
-      setState(() => _appointments = data ?? []);
-    } catch (_) {
-      setState(() => _appointments = []);
-    } finally {
-      setState(() => _loadingAppointments = false);
     }
   }
 
@@ -81,23 +66,15 @@ class _PatientHomeShellState extends State<PatientHomeShell>
         ),
         backgroundColor: const Color(0xFF1976D2),
         elevation: 2,
-        actions: _currentIndex == 0
-            ? [
-                IconButton(
-                  tooltip: 'تحديث الأطباء',
-                  onPressed: _loadDoctors,
-                  icon: const Icon(Icons.refresh),
-                )
-              ]
-            : _currentIndex == 1
-                ? [
-                    IconButton(
-                      tooltip: 'تحديث المواعيد',
-                      onPressed: _loadAppointments,
-                      icon: const Icon(Icons.refresh),
-                    )
-                  ]
-                : null,
+        actions: [
+          const NotificationBell(),
+          if (_currentIndex == 0)
+            IconButton(
+              tooltip: 'تحديث الأطباء',
+              onPressed: _loadDoctors,
+              icon: const Icon(Icons.refresh),
+            ),
+        ],
       ),
       body: PageView(
         controller: _pageController,
@@ -111,15 +88,16 @@ class _PatientHomeShellState extends State<PatientHomeShell>
               final booked = await Navigator.of(context).push(slideRoute(
                 BookAppointmentScreen(doctor: doctor),
               ));
-              if (booked == true) _loadAppointments();
+              if (booked == true) {
+                setState(() => _appointmentsReload++);
+              }
             },
           ),
 
           // تبويب المواعيد
-          _AppointmentsTab(
-            loading: _loadingAppointments,
-            appointments: _appointments,
-            onRefresh: _loadAppointments,
+          PatientAppointmentsScreen(
+            key: ValueKey(_appointmentsReload),
+            embedded: true,
           ),
 
           // تبويب الملف الشخصي
@@ -212,99 +190,6 @@ class _HomeTab extends StatelessWidget {
   }
 }
 
-/// 🔹 تبويب المواعيد
-class _AppointmentsTab extends StatelessWidget {
-  final bool loading;
-  final List<dynamic> appointments;
-  final Future<void> Function() onRefresh;
-
-  const _AppointmentsTab({
-    required this.loading,
-    required this.appointments,
-    required this.onRefresh,
-  });
-
-  Color _statusColor(String s) {
-    switch (s.toLowerCase()) {
-      case 'confirmed':
-      case 'accepted':
-        return Colors.green;
-      case 'rejected':
-        return Colors.red;
-      default:
-        return Colors.orange;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (loading) {
-      return const Center(
-          child: CircularProgressIndicator(color: Color(0xFF1976D2)));
-    }
-    if (appointments.isEmpty) {
-      return const Center(child: Text('لا توجد مواعيد حتى الآن'));
-    }
-    return RefreshIndicator(
-      color: const Color(0xFF1976D2),
-      onRefresh: onRefresh,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: appointments.length,
-        itemBuilder: (_, i) {
-          final a = appointments[i];
-          final doctorName =
-              a['doctor']?['fullName'] ?? a['doctorName'] ?? 'Doctor';
-          final startsAtStr = a['startsAt'] ?? '';
-          DateTime? startsAt;
-          try {
-            startsAt = DateTime.tryParse(startsAtStr);
-          } catch (_) {}
-          final dateText = startsAt == null
-              ? startsAtStr
-              : DateFormat('y/MM/dd • HH:mm').format(startsAt);
-          final status = (a['status'] ?? 'Pending').toString();
-
-          return Card(
-            elevation: 2.5,
-            margin: const EdgeInsets.only(bottom: 12),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: ListTile(
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              leading: CircleAvatar(
-                backgroundColor: const Color(0x221976D2),
-                child: const Icon(Icons.calendar_today,
-                    color: Color(0xFF1976D2)),
-              ),
-              title: Text(doctorName,
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text(dateText),
-              trailing: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _statusColor(status).withOpacity(.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  status,
-                  style: TextStyle(
-                    color: _statusColor(status),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12.5,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
 /// 🔹 تبويب الملف الشخصي
 class _ProfileTab extends StatelessWidget {
   const _ProfileTab();
@@ -350,6 +235,7 @@ class _ProfileTab extends StatelessWidget {
                     const Icon(Icons.exit_to_app_rounded, color: Colors.red),
                 onTap: () async {
                   await ApiService.logout();
+                  if (!context.mounted) return;
                   Navigator.pushNamedAndRemoveUntil(
                     context,
                     AppRoutes.login,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../models/doctor_profile.dart';
+import '../../core/routes/app_routes.dart';
 
 class DoctorProfileScreen extends StatelessWidget {
   const DoctorProfileScreen({super.key});
@@ -42,9 +43,10 @@ class DoctorProfileScreen extends StatelessWidget {
             const Divider(),
 
             _infoRow(Icons.phone, d.phoneNumber),
-            _infoRow(Icons.school, d.education),
+            _infoRow(Icons.school, d.university),
+            _infoRow(Icons.workspace_premium, d.qualification),
             _infoRow(Icons.location_on, d.clinicAddress),
-            _infoRow(Icons.work_outline, '${d.yearsOfExperience} سنوات خبرة'),
+            _infoRow(Icons.work_outline, '${d.experienceYears} سنوات خبرة'),
 
             const SizedBox(height: 12),
             Text(
@@ -70,6 +72,11 @@ class DoctorProfileScreen extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 6),
+            const Text(
+              'التقييم مبني على آراء المرضى بعد الزيارة.',
+              style: TextStyle(fontSize: 12, color: Colors.black54),
+            ),
 
             const SizedBox(height: 24),
 
@@ -79,6 +86,14 @@ class DoctorProfileScreen extends StatelessWidget {
               label: const Text('تعديل البيانات'),
               onPressed: () {
                 Navigator.pushNamed(context, '/edit-doctor-profile');
+              },
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.schedule),
+              label: const Text('ساعات الدوام'),
+              onPressed: () {
+                Navigator.pushNamed(context, AppRoutes.doctorWorkingHours);
               },
             ),
           ],

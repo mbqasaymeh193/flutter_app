@@ -194,7 +194,8 @@ class _SignupScreenState extends State<SignupScreen> {
             const SizedBox(height: 12),
 
             DropdownButtonFormField<String>(
-              value: _role,
+              key: ValueKey<String>(_role),
+              initialValue: _role,
               items: const [
                 DropdownMenuItem(value: 'Patient', child: Text('Patient')),
                 DropdownMenuItem(value: 'Doctor', child: Text('Doctor')),

@@ -132,7 +132,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withAlpha((0.1 * 255).round()),
               blurRadius: 6,
               offset: const Offset(0, 3),
             )
@@ -200,7 +200,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: statusColor.withOpacity(.15),
+                color: statusColor.withAlpha((0.15 * 255).round()),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(

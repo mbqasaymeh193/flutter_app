@@ -157,7 +157,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                     width: 42,
                                     height: 42,
                                     decoration: BoxDecoration(
-                                      color: color.withOpacity(0.12),
+                                      color: color.withAlpha((0.12 * 255).round()),
                                       borderRadius: BorderRadius.circular(14),
                                     ),
                                     child: Icon(icon, color: color),
@@ -186,7 +186,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                                         vertical: 4),
                                                 decoration: BoxDecoration(
                                                   color: primary
-                                                      .withOpacity(0.12),
+                                                  .withAlpha((0.12 * 255).round()),
                                                   borderRadius:
                                                       BorderRadius.circular(
                                                           999),

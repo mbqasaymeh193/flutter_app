@@ -44,6 +44,8 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
       role = (prefs.getString('role') ?? '').toLowerCase();
     }
 
+    if (!mounted) return;
+
     // 4) التوجيه حسب الدور
     if (role == 'doctor') {
       Navigator.pushNamedAndRemoveUntil(
