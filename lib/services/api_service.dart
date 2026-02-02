@@ -763,8 +763,24 @@ class ApiService {
     required int stars,
     String? comment,
   }) async {
+    final res = await submitDoctorRatingDetailed(
+      appointmentId: appointmentId,
+      stars: stars,
+      comment: comment,
+    );
+    return res?['ok'] == true ||
+        res?['statusCode'] == 200 ||
+        res?['statusCode'] == 201;
+  }
+
+  /// ✅ POST /api/doctor-ratings (تفصيلي)
+  static Future<Map<String, dynamic>?> submitDoctorRatingDetailed({
+    required int appointmentId,
+    required int stars,
+    String? comment,
+  }) async {
     await loadToken();
-    if (token == null) return false;
+    if (token == null) return null;
 
     try {
       final res = await _post(
@@ -772,9 +788,22 @@ class ApiService {
         withAuth: true,
         body: {"appointmentId": appointmentId, "stars": stars, "comment": comment},
       );
-      return res.statusCode == 200 || res.statusCode == 201;
+
+      final data = _tryDecode(res.body);
+      final map = <String, dynamic>{
+        "statusCode": res.statusCode,
+        "ok": res.statusCode == 200 || res.statusCode == 201,
+      };
+
+      if (data is Map) {
+        map.addAll(Map<String, dynamic>.from(data));
+      } else if (data != null) {
+        map["message"] = data.toString();
+      }
+
+      return map;
     } catch (_) {
-      return false;
+      return null;
     }
   }
 

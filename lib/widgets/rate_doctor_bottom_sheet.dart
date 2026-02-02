@@ -10,7 +10,7 @@ Future<void> showRateDoctorBottomSheet({
   required void Function() onRatedSuccessfully,
   required void Function() onRateLater,
 }) async {
-  await showModalBottomSheet(
+  final result = await showModalBottomSheet<_RateSheetResult>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
@@ -24,11 +24,17 @@ Future<void> showRateDoctorBottomSheet({
         doctorName: doctorName,
         specialty: specialty,
         onRatedSuccessfully: onRatedSuccessfully,
-        onRateLater: onRateLater,
+        onResult: (r) => Navigator.pop(context, r),
       );
     },
   );
+
+  if (result != _RateSheetResult.rated) {
+    onRateLater();
+  }
 }
+
+enum _RateSheetResult { rated, later }
 
 class _RateDoctorSheet extends StatefulWidget {
   final int appointmentId;
@@ -37,7 +43,7 @@ class _RateDoctorSheet extends StatefulWidget {
   final String specialty;
 
   final void Function() onRatedSuccessfully;
-  final void Function() onRateLater;
+  final void Function(_RateSheetResult result) onResult;
 
   const _RateDoctorSheet({
     required this.appointmentId,
@@ -45,7 +51,7 @@ class _RateDoctorSheet extends StatefulWidget {
     required this.doctorName,
     required this.specialty,
     required this.onRatedSuccessfully,
-    required this.onRateLater,
+    required this.onResult,
   });
 
   @override
@@ -68,7 +74,7 @@ class _RateDoctorSheetState extends State<_RateDoctorSheet> {
 
     setState(() => _sending = true);
 
-    final ok = await ApiService.submitDoctorRating(
+    final res = await ApiService.submitDoctorRatingDetailed(
       appointmentId: widget.appointmentId,
       stars: _stars,
       comment: _comment.text.trim().isEmpty ? null : _comment.text.trim(),
@@ -78,15 +84,31 @@ class _RateDoctorSheetState extends State<_RateDoctorSheet> {
 
     setState(() => _sending = false);
 
+    final ok = res?['ok'] == true ||
+        res?['statusCode'] == 200 ||
+        res?['statusCode'] == 201;
+    final msg = (res?['message'] ??
+            res?['error'] ??
+            res?['title'] ??
+            res?['detail'])
+        ?.toString()
+        .trim();
+
     if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ تم إرسال التقييم بنجاح')),
+        SnackBar(content: Text(msg?.isNotEmpty == true ? msg! : 'تم إرسال التقييم بنجاح')),
       );
-      Navigator.pop(context);
+      widget.onResult(_RateSheetResult.rated);
       widget.onRatedSuccessfully();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('فشل إرسال التقييم')),
+        SnackBar(
+          content: Text(
+            msg?.isNotEmpty == true
+                ? msg!
+                : 'فشل إرسال التقييم، حاول مرة أخرى.',
+          ),
+        ),
       );
     }
   }
@@ -188,8 +210,7 @@ class _RateDoctorSheetState extends State<_RateDoctorSheet> {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {
-                    Navigator.pop(context);
-                    widget.onRateLater();
+                    widget.onResult(_RateSheetResult.later);
                   },
                   child: const Text('تقييم لاحقًا'),
                 ),
