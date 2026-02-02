@@ -15,7 +15,7 @@ class DoctorAddMedicalRecordScreen extends StatefulWidget {
   final String? initialAllergies;
   final String? initialSideEffects;
 
-  // (اختياري)
+  // ✅ مهم عند الإنشاء
   final int? appointmentId;
 
   const DoctorAddMedicalRecordScreen({
@@ -50,6 +50,11 @@ class _DoctorAddMedicalRecordScreenState
 
   bool get _isEdit => widget.recordId != null;
 
+  bool get _hasValidAppointmentForCreate =>
+      widget.appointmentId != null && widget.appointmentId! > 0;
+
+  bool get _canSubmit => !_loading && (_isEdit || _hasValidAppointmentForCreate);
+
   @override
   void initState() {
     super.initState();
@@ -75,8 +80,20 @@ class _DoctorAddMedicalRecordScreenState
     return t.isEmpty ? null : t;
   }
 
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   Future<void> _submit() async {
+    if (!_canSubmit) return;
+
     if (!_formKey.currentState!.validate()) return;
+
+    // ✅ منع إنشاء سجل بدون appointmentId
+    if (!_isEdit && !_hasValidAppointmentForCreate) {
+      _snack('لا يمكن إنشاء سجل طبي بدون رقم موعد صحيح.');
+      return;
+    }
 
     setState(() => _loading = true);
 
@@ -102,6 +119,7 @@ class _DoctorAddMedicalRecordScreenState
       } else {
         ok = await ApiService.createMedicalRecord(
           patientId: widget.patientId,
+          appointmentId: widget.appointmentId!, // ✅ الحل هنا
           diagnosis: diagnosis,
           notes: notes,
           medication: medication,
@@ -113,28 +131,14 @@ class _DoctorAddMedicalRecordScreenState
       if (!mounted) return;
 
       if (ok) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_isEdit
-                ? 'تم تحديث السجل الطبي ✅'
-                : 'تم حفظ السجل الطبي ✅'),
-          ),
-        );
+        _snack(_isEdit ? 'تم تحديث السجل الطبي ✅' : 'تم حفظ السجل الطبي ✅');
         Navigator.pop(context, true);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_isEdit
-                ? 'فشل تحديث السجل الطبي ❌'
-                : 'فشل حفظ السجل الطبي ❌'),
-          ),
-        );
+        _snack(_isEdit ? 'فشل تحديث السجل الطبي ❌' : 'فشل حفظ السجل الطبي ❌');
       }
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('حدث خطأ أثناء حفظ السجل')),
-      );
+      _snack('حدث خطأ أثناء حفظ السجل');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -153,9 +157,9 @@ class _DoctorAddMedicalRecordScreenState
   Widget build(BuildContext context) {
     final subtitle = _isEdit
         ? 'تعديل سجل موجود'
-        : (widget.appointmentId == null
-            ? 'سيتم إنشاء سجل للمريض المختار'
-            : 'موعد رقم #${widget.appointmentId}');
+        : (_hasValidAppointmentForCreate
+            ? 'موعد رقم #${widget.appointmentId}'
+            : '⚠️ لا يوجد رقم موعد (لن يمكن الحفظ)');
 
     return Scaffold(
       appBar: AppBar(
@@ -176,6 +180,25 @@ class _DoctorAddMedicalRecordScreenState
                   subtitle: Text(subtitle),
                 ),
               ),
+
+              if (!_isEdit && !_hasValidAppointmentForCreate) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.withOpacity(0.25)),
+                  ),
+                  child: const Text(
+                    'لا يمكن إنشاء سجل طبي إلا إذا كان هناك appointmentId صحيح.\n'
+                    'افتح هذه الشاشة من تفاصيل موعد مؤكد/محدد (Appointment) ثم أعد المحاولة.',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 10),
               Expanded(
                 child: Form(
@@ -185,9 +208,8 @@ class _DoctorAddMedicalRecordScreenState
                       TextFormField(
                         controller: _diagnosis,
                         decoration: _dec('Diagnosis', hint: 'مثال: Flu, Allergy...'),
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Diagnosis مطلوب'
-                            : null,
+                        validator: (v) =>
+                            (v == null || v.trim().isEmpty) ? 'Diagnosis مطلوب' : null,
                       ),
                       const SizedBox(height: 10),
                       TextFormField(
@@ -195,9 +217,8 @@ class _DoctorAddMedicalRecordScreenState
                         decoration: _dec('Notes', hint: 'ملاحظات الطبيب'),
                         minLines: 3,
                         maxLines: 6,
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Notes مطلوبة'
-                            : null,
+                        validator: (v) =>
+                            (v == null || v.trim().isEmpty) ? 'Notes مطلوبة' : null,
                       ),
                       const SizedBox(height: 10),
                       TextFormField(
@@ -228,10 +249,12 @@ class _DoctorAddMedicalRecordScreenState
                                   ),
                                 )
                               : Icon(_isEdit ? Icons.check : Icons.save),
-                          label: Text(_loading
-                              ? 'Saving...'
-                              : (_isEdit ? 'Update Medical Record' : 'Save Medical Record')),
-                          onPressed: _loading ? null : _submit,
+                          label: Text(
+                            _loading
+                                ? 'Saving...'
+                                : (_isEdit ? 'Update Medical Record' : 'Save Medical Record'),
+                          ),
+                          onPressed: _canSubmit ? _submit : null,
                         ),
                       ),
                     ],

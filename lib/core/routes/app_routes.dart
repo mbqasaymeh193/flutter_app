@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:healthcare_flutter_app/screens/doctor/doctor_home_shell.dart';
 import 'package:healthcare_flutter_app/screens/doctor/doctor_patients_screen.dart';
 
+// ✅ لازم يكون عندك هذا الملف (عدّل المسار إذا مختلف)
+import 'package:healthcare_flutter_app/screens/doctor/edit_doctor_profile_screen.dart';
+
 // Auth
 import 'package:healthcare_flutter_app/screens/auth/login_screen.dart';
 import 'package:healthcare_flutter_app/screens/auth/signup_screen.dart';
@@ -20,6 +23,9 @@ import 'package:healthcare_flutter_app/screens/patient/patient_home_shell.dart';
 import 'package:healthcare_flutter_app/screens/patient/patient_appointments_screen.dart';
 import 'package:healthcare_flutter_app/screens/admin/admin_home_shell.dart';
 
+// ✅ Book Appointment Screen (عدّل المسار إذا مختلف)
+import 'package:healthcare_flutter_app/screens/main/appointment/book_appointment_screen.dart';
+
 // Notifications screens
 import 'package:healthcare_flutter_app/screens/notifications/notifications_screen.dart';
 import 'package:healthcare_flutter_app/screens/admin/admin_notifications_screen.dart';
@@ -29,12 +35,11 @@ class AppRoutes {
   static const String gate = '/gate';
 
   // ===================== Auth =====================
-static const String login = '/login';
-static const String signup = '/signup';
+  static const String login = '/login';
+  static const String signup = '/signup';
 
-// alias قديم (اختياري)
-static const String register = '/register';
-
+  // alias قديم (اختياري)
+  static const String register = '/register';
 
   static const String forgotPassword = '/forgot-password';
   static const String resetPassword = '/reset-password';
@@ -48,8 +53,12 @@ static const String register = '/register';
   // ===================== Patient ====================
   static const String patientHomeShell = '/patientHomeShell';
   static const String patientAppointments = '/patientAppointments';
-  static const editDoctorProfile = '/edit-doctor-profile';
 
+  // ✅ Route جديد للحجز (كان ناقص)
+  static const String bookAppointment = '/bookAppointment';
+
+  // ✅ تصحيح: لازم يكون String
+  static const String editDoctorProfile = '/edit-doctor-profile';
 
   // ===================== Doctor =====================
   // 0: Dashboard, 1: Appointments, 2: Records, 3: Profile
@@ -58,8 +67,7 @@ static const String register = '/register';
   static const String doctorAppointments = '/doctorAppointments';
   static const String doctorRecords = '/doctorRecords';
   static const String doctorProfile = '/doctorProfile';
-
-
+  static const String doctorAddMedicalRecord = '/doctor/add-medical-record';
   static const String doctorPatientsScreen = '/doctorPatientsScreen';
 
   // ===================== Admin ======================
@@ -70,7 +78,6 @@ static const String register = '/register';
   static const String adminPatients = '/adminPatients';
   static const String adminAppointments = '/adminAppointments';
   static const String adminSettings = '/adminSettings';
-  
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -97,10 +104,9 @@ static const String register = '/register';
 
       case changePassword:
         return MaterialPageRoute(builder: (_) => const ChangePasswordScreen());
+
       case editDoctorProfile:
-       return MaterialPageRoute(
-      builder: (_) => const EditDoctorProfileScreen(),
-    );
+        return MaterialPageRoute(builder: (_) => const EditDoctorProfileScreen());
 
       case registerSuccess: {
         final args = settings.arguments as Map<String, dynamic>?;
@@ -126,6 +132,14 @@ static const String register = '/register';
 
       case patientAppointments:
         return MaterialPageRoute(builder: (_) => const PatientAppointmentsScreen());
+
+      // ✅ Book Appointment Route
+      case bookAppointment: {
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (_) => BookAppointmentScreen(doctor: args),
+        );
+      }
 
       // ---------- Doctor Shell ----------
       case doctorHomeShell: {

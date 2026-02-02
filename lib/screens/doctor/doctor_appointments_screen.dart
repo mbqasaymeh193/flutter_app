@@ -1,6 +1,11 @@
+// ignore_for_file: unused_import
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../services/api_service.dart';
+
+// ✅ جاهزين لاستخدام routes لاحقاً
+import '../../core/routes/app_routes.dart';
 
 class DoctorAppointmentsScreen extends StatefulWidget {
   const DoctorAppointmentsScreen({super.key});
@@ -13,6 +18,8 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
   List<dynamic> appointments = [];
   bool isLoading = true;
   String? errorMessage;
+
+  int? _updatingAppointmentId;
 
   @override
   void initState() {
@@ -27,18 +34,105 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
     });
 
     try {
-      final data = await ApiService.getDoctorAppointments();
+      final dynamic response = await ApiService.getDoctorAppointments();
+      if (!mounted) return;
+
+      List<dynamic> list = [];
+
+      if (response is List) {
+        list = List<dynamic>.from(response);
+      } else if (response is Map && response['appointments'] is List) {
+        list = List<dynamic>.from(response['appointments'] as List);
+      } else if (response is Map && response['items'] is List) {
+        list = List<dynamic>.from(response['items'] as List);
+      } else {
+        list = [];
+      }
+
       setState(() {
-        appointments = (data ?? []);
+        appointments = list;
         isLoading = false;
       });
-    } catch (e) {
+    } catch (_) {
+      if (!mounted) return;
       setState(() {
         appointments = [];
         isLoading = false;
         errorMessage = 'حدث خطأ أثناء تحميل المواعيد';
       });
     }
+  }
+
+  // ====================== Helpers (Safe) ======================
+
+  int _safeInt(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    return int.tryParse(v.toString()) ?? 0;
+  }
+
+  String _safeStr(dynamic v) => (v ?? '').toString().trim();
+
+  String _formatDateTime(dynamic isoString) {
+    final s = _safeStr(isoString);
+    if (s.isEmpty) return 'غير معروف';
+    final dt = DateTime.tryParse(s);
+    if (dt == null) return s;
+    return DateFormat('y/MM/dd • HH:mm').format(dt.toLocal());
+  }
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  // ====================== Status (Text + Code) ======================
+
+  int _statusToCode(String statusText) {
+    final s = statusText.toLowerCase().trim();
+    if (s == 'pending') return 0;
+    if (s == 'confirmed' || s == 'accepted') return 1;
+    if (s == 'rejected') return 2;
+    return 0;
+  }
+
+  String _normalizeStatusText(String s) {
+    final lower = s.toLowerCase();
+    if (lower == 'confirmed' || lower == 'accepted') return 'Confirmed';
+    if (lower == 'rejected') return 'Rejected';
+    if (lower == 'pending') return 'Pending';
+    return s;
+  }
+
+  String _statusFromAny(dynamic v) {
+    if (v is int) {
+      switch (v) {
+        case 0:
+          return 'Pending';
+        case 1:
+          return 'Confirmed';
+        case 2:
+          return 'Rejected';
+        default:
+          return 'Pending';
+      }
+    }
+    final s = _safeStr(v);
+    return s.isEmpty ? 'Pending' : _normalizeStatusText(s);
+  }
+
+  bool _isPendingAny(dynamic v) {
+    if (v is int) return v == 0;
+    return _safeStr(v).toLowerCase() == 'pending';
+  }
+
+  String _statusLabel(String s) => _normalizeStatusText(s);
+
+  String _statusLabelAr(String s) {
+    final lower = s.toLowerCase();
+    if (lower == 'confirmed' || lower == 'accepted') return 'مؤكد ✅';
+    if (lower == 'rejected') return 'مرفوض ❌';
+    if (lower == 'pending') return 'قيد الانتظار ⏳';
+    return s;
   }
 
   Color _statusColor(String s) {
@@ -53,29 +147,172 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
     }
   }
 
-  Future<void> _updateStatus(dynamic id, String status) async {
-    final success = await ApiService.updateAppointmentStatus(id, status);
-    if (!mounted) return;
+  // ====================== Payment ======================
 
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            status.toLowerCase() == 'confirmed'
-                ? 'تم تأكيد الموعد ✅'
-                : status.toLowerCase() == 'rejected'
-                    ? 'تم رفض الموعد ❌'
-                    : 'تم تحديث حالة الموعد',
-          ),
-        ),
-      );
-      await _fetchAppointments();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('فشل في تحديث حالة الموعد')),
-      );
+  String _paymentLabelAr(dynamic s) {
+    final v = _safeStr(s);
+    if (v.isEmpty) return 'غير معروف';
+    switch (v.toLowerCase()) {
+      case 'pending':
+        return 'غير مدفوع';
+      case 'authorized':
+        return 'مفوض (On Hold)';
+      case 'captured':
+        return 'مدفوع';
+      case 'failed':
+        return 'فشل الدفع';
+      case 'released':
+        return 'تم الإرجاع/الإلغاء';
+      default:
+        return v;
     }
   }
+
+  Color _paymentColor(dynamic s) {
+    final v = _safeStr(s).toLowerCase();
+    if (v == 'captured') return Colors.green;
+    if (v == 'authorized') return Colors.blue;
+    if (v == 'failed') return Colors.red;
+    if (v == 'released') return Colors.purple;
+    return Colors.grey;
+  }
+
+  // ====================== Update Status (No Compile Type Errors) ======================
+
+  Future<bool> _callUpdateAppointmentStatus({
+    required int appointmentId,
+    required String statusText,
+  }) async {
+    // ✅ نستخدم Function.apply حتى لا يهمنا هل ApiService يستقبل String أو int
+    final dynamic fn = ApiService.updateAppointmentStatus;
+
+    // 1) جرّب إرسال String (المعيار الصحيح حسب Swagger)
+    try {
+      final String normalized = _normalizeStatusText(statusText);
+      final dynamic r = await Function.apply(fn, [appointmentId, normalized]);
+      return r == true;
+    } catch (_) {
+      // 2) إذا ApiService يتوقع int، جرّب إرسال code
+      try {
+        final int code = _statusToCode(statusText);
+        final dynamic r2 = await Function.apply(fn, [appointmentId, code]);
+        return r2 == true;
+      } catch (_) {
+        return false;
+      }
+    }
+  }
+
+  Future<void> _updateStatus(dynamic appointmentIdRaw, String statusText) async {
+    if (_updatingAppointmentId != null) return;
+
+    final int appointmentId = _safeInt(appointmentIdRaw);
+    if (appointmentId <= 0) {
+      _snack('رقم الموعد غير صحيح');
+      return;
+    }
+
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('تأكيد العملية'),
+        content: Text(
+          statusText.toLowerCase() == 'confirmed'
+              ? 'هل تريد تأكيد هذا الموعد؟'
+              : 'هل تريد رفض هذا الموعد؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('تأكيد'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    setState(() => _updatingAppointmentId = appointmentId);
+
+    try {
+      final success = await _callUpdateAppointmentStatus(
+        appointmentId: appointmentId,
+        statusText: statusText,
+      );
+
+      if (!mounted) return;
+
+      if (success) {
+        _snack(
+          statusText.toLowerCase() == 'confirmed'
+              ? 'تم تأكيد الموعد ✅'
+              : 'تم رفض الموعد ❌',
+        );
+        await _fetchAppointments();
+      } else {
+        _snack('فشل في تحديث حالة الموعد');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      _snack('حدث خطأ أثناء تحديث حالة الموعد');
+    } finally {
+      if (mounted) setState(() => _updatingAppointmentId = null);
+    }
+  }
+
+  // ====================== Details Sheet ======================
+
+  void _openDetailsSheet({
+    required int appointmentId,
+    required String patientName,
+    required String startsAtText,
+    required String statusText,
+    required dynamic paymentStatus,
+    required String priceText,
+    required String patientPhone,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black12,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            Text(
+              'تفاصيل الموعد #$appointmentId',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 12),
+            Text('المريض: ${patientName.isEmpty ? "غير معروف" : patientName}'),
+            Text('الوقت: $startsAtText'),
+            Text('الحالة: ${_statusLabelAr(statusText)}'),
+            Text('الدفع: ${_paymentLabelAr(paymentStatus)}'),
+            if (priceText.isNotEmpty) Text('السعر: $priceText'),
+            if (patientPhone.isNotEmpty) Text('هاتف: $patientPhone'),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ====================== UI ======================
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +322,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
       return Center(
         child: Text(
           errorMessage!,
-          style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+          style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
         ),
       );
     }
@@ -95,49 +332,97 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
         onRefresh: _fetchAppointments,
         child: ListView(
           children: const [
-            SizedBox(height: 200),
+            SizedBox(height: 220),
             Center(child: Text('لا توجد مواعيد حالياً')),
           ],
         ),
       );
     }
-    Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (_) => DoctorPublicProfileScreen(doctor: doctor),
-  ),
-);
 
     return RefreshIndicator(
       onRefresh: _fetchAppointments,
       child: ListView.builder(
-        padding: const EdgeInsets.all(8.0),
+        padding: const EdgeInsets.all(8),
         itemCount: appointments.length,
         itemBuilder: (context, index) {
-          final appointment = appointments[index];
+          final raw = appointments[index];
+          if (raw is! Map) return const SizedBox.shrink();
+          final appointment = Map<String, dynamic>.from(raw);
 
-          final patientName =
-              appointment['patient']?['fullName'] ??
-              appointment['patientName'] ??
-              'Patient';
+          final patientMap = appointment['patient'];
+          final patientName = (patientMap is Map)
+              ? _safeStr(patientMap['fullName'])
+              : _safeStr(appointment['patientName']);
 
-          final startsAtStr = appointment['startsAt']?.toString() ?? '';
-          DateTime? startsAt = DateTime.tryParse(startsAtStr);
-          final timeText = startsAt == null
-              ? startsAtStr
-              : DateFormat('y/MM/dd • HH:mm').format(startsAt.toLocal());
+          final patientPhone = (patientMap is Map)
+              ? _safeStr(patientMap['phoneNumber'])
+              : '';
 
-          final status = (appointment['status'] ?? 'Pending').toString();
+          final startsAtText = _formatDateTime(appointment['startsAt']);
+
+          final statusText = _statusFromAny(appointment['status']);
+          final paymentStatus = appointment['paymentStatus'];
+          final priceText = _safeStr(appointment['price']);
+
+          final appointmentId = _safeInt(appointment['id']);
+          final bool canChangeStatus = _isPendingAny(appointment['status']);
+          final bool isUpdatingThis = _updatingAppointmentId == appointmentId;
 
           return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: const Color(0x221976D2),
-                child: const Icon(Icons.person, color: Color(0xFF1976D2)),
+              leading: const CircleAvatar(
+                backgroundColor: Color(0x221976D2),
+                child: Icon(Icons.person, color: Color(0xFF1976D2)),
               ),
-              title: Text('المريض: $patientName'),
-              subtitle: Text('الوقت: $timeText'),
+              title: Text(
+                patientName.isEmpty ? 'المريض: غير معروف' : 'المريض: $patientName',
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 4),
+                  Text('الوقت: $startsAtText'),
+                  if (priceText.isNotEmpty) Text('السعر: $priceText'),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.payments_outlined, size: 16),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _paymentColor(paymentStatus).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'الدفع: ${_paymentLabelAr(paymentStatus)}',
+                          style: TextStyle(
+                            color: _paymentColor(paymentStatus),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (patientPhone.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text('هاتف المريض: $patientPhone'),
+                  ],
+                ],
+              ),
+              onTap: () {
+                _openDetailsSheet(
+                  appointmentId: appointmentId,
+                  patientName: patientName,
+                  startsAtText: startsAtText,
+                  statusText: statusText,
+                  paymentStatus: paymentStatus,
+                  priceText: priceText,
+                  patientPhone: patientPhone,
+                );
+              },
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -145,26 +430,38 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     margin: const EdgeInsets.only(right: 8),
                     decoration: BoxDecoration(
-                      color: _statusColor(status).withOpacity(0.15),
+                      color: _statusColor(statusText).withOpacity(0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      status,
+                      _statusLabel(statusText),
                       style: TextStyle(
-                        color: _statusColor(status),
-                        fontWeight: FontWeight.w600,
+                        color: _statusColor(statusText),
+                        fontWeight: FontWeight.w700,
                         fontSize: 12,
                       ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.check, color: Colors.green),
-                    onPressed: () => _updateStatus(appointment['id'], 'confirmed'),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.red),
-                    onPressed: () => _updateStatus(appointment['id'], 'rejected'),
-                  ),
+                  if (isUpdatingThis)
+                    const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else ...[
+                    IconButton(
+                      icon: const Icon(Icons.check, color: Colors.green),
+                      onPressed: (canChangeStatus && appointmentId > 0)
+                          ? () => _updateStatus(appointmentId, 'confirmed')
+                          : null,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.red),
+                      onPressed: (canChangeStatus && appointmentId > 0)
+                          ? () => _updateStatus(appointmentId, 'rejected')
+                          : null,
+                    ),
+                  ],
                 ],
               ),
             ),

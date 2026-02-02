@@ -1,3 +1,5 @@
+// ignore_for_file: unused_import, avoid_print
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -5,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
+import '../models/doctor_profile.dart';
 
 class ApiService {
   static String? token;
@@ -20,22 +23,39 @@ class ApiService {
   // ✅ Timeout لكل الطلبات
   static const Duration _timeout = Duration(seconds: 15);
 
-  // ====================== Token ======================
+  // ====================== BaseUrl ======================
+  /// يدعم حالتين:
+  /// 1) AppConfig.apiBaseUrl = http://host:port/api
+  /// 2) AppConfig.apiBaseUrl = http://host:port  (نضيف /api تلقائياً)
+  static String get baseUrl {
+    String b = AppConfig.apiBaseUrl.trim();
+    while (b.endsWith('/')) {
+      b = b.substring(0, b.length - 1);
+    }
+    if (b.toLowerCase().endsWith('/api')) return b;
+    return '$b/api';
+  }
+
+  static Uri _url(String path, {Map<String, String>? query}) {
+    final p = path.startsWith('/') ? path.substring(1) : path;
+    return Uri.parse('$baseUrl/$p').replace(queryParameters: query);
+  }
+
+  // ====================== Token (COMPAT) ======================
+
+  /// ✅ موجودة لأن ملفاتك تستدعيها
+  static Future<void> loadToken() async {
+    if (token != null && token!.isNotEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    token = prefs.getString(_kTokenNew) ?? prefs.getString(_kTokenOld);
+  }
 
   /// ✅ تخزين التوكن (يكتب الجديد + القديم للتوافق)
   static Future<void> saveToken(String newToken) async {
     final prefs = await SharedPreferences.getInstance();
     token = newToken;
-
     await prefs.setString(_kTokenNew, newToken);
-    await prefs.setString(_kTokenOld, newToken); // backward compatibility
-  }
-
-  /// ✅ تحميل التوكن (يقرأ الجديد ثم القديم)
-  static Future<void> loadToken() async {
-    if (token != null && token!.isNotEmpty) return;
-    final prefs = await SharedPreferences.getInstance();
-    token = prefs.getString(_kTokenNew) ?? prefs.getString(_kTokenOld);
+    await prefs.setString(_kTokenOld, newToken);
   }
 
   /// ✅ تخزين بيانات المستخدم الأساسية
@@ -64,10 +84,6 @@ class ApiService {
 
   // ====================== Helpers ======================
 
-  /// ✅ AppConfig.apiBaseUrl يجب أن يكون مثل:
-  /// http://127.0.0.1:7000/api
-  static Uri _url(String path) => Uri.parse("${AppConfig.apiBaseUrl}$path");
-
   static Map<String, String> _jsonHeaders({bool withAuth = false}) {
     final h = <String, String>{
       "Content-Type": "application/json",
@@ -78,6 +94,8 @@ class ApiService {
     }
     return h;
   }
+
+  static Map<String, String> _authHeaders() => _jsonHeaders(withAuth: true);
 
   static dynamic _tryDecode(String body) {
     if (body.trim().isEmpty) return null;
@@ -108,14 +126,48 @@ class ApiService {
     return null;
   }
 
-  static bool _isNotFound(http.Response res) => res.statusCode == 404;
+  static bool _hasAnyKey(Map map, List<String> keys) {
+    for (final k in keys) {
+      if (map.containsKey(k)) return true;
+    }
+    return false;
+  }
+
+  static int _safeInt(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    return int.tryParse(v.toString()) ?? 0;
+  }
+
+  static Future<int?> _loadUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final v = prefs.getInt(_kUserId);
+    if (v != null && v > 0) return v;
+    final s = prefs.getString(_kUserId);
+    final n = int.tryParse(s ?? '');
+    if (n != null && n > 0) return n;
+    return null;
+  }
+
+  static List<dynamic> _extractList(dynamic data) {
+    if (data is List) return data;
+    if (data is Map) {
+      if (data['appointments'] is List) return List<dynamic>.from(data['appointments']);
+      if (data['items'] is List) return List<dynamic>.from(data['items']);
+      if (data['data'] is List) return List<dynamic>.from(data['data']);
+    }
+    return [];
+  }
 
   static Future<http.Response> _get(
     String path, {
     bool withAuth = false,
+    Map<String, String>? query,
   }) async {
+    // ✅ ملاحظة: loadToken لا يضر حتى لو الطلب بدون Auth
+    await loadToken();
     return http
-        .get(_url(path), headers: _jsonHeaders(withAuth: withAuth))
+        .get(_url(path, query: query), headers: _jsonHeaders(withAuth: withAuth))
         .timeout(_timeout);
   }
 
@@ -124,6 +176,7 @@ class ApiService {
     bool withAuth = false,
     Map<String, dynamic>? body,
   }) async {
+    await loadToken();
     return http
         .post(
           _url(path),
@@ -138,6 +191,23 @@ class ApiService {
     bool withAuth = false,
     Map<String, dynamic>? body,
   }) async {
+    await loadToken();
+    return http
+        .put(
+          _url(path),
+          headers: _jsonHeaders(withAuth: withAuth),
+          body: body == null ? null : jsonEncode(body),
+        )
+        .timeout(_timeout);
+  }
+
+  /// ✅ PUT يدعم Map أو List (مهم لـ working-hours)
+  static Future<http.Response> _putAny(
+    String path, {
+    bool withAuth = false,
+    Object? body,
+  }) async {
+    await loadToken();
     return http
         .put(
           _url(path),
@@ -151,82 +221,21 @@ class ApiService {
     String path, {
     bool withAuth = false,
   }) async {
+    await loadToken();
     return http
         .delete(_url(path), headers: _jsonHeaders(withAuth: withAuth))
         .timeout(_timeout);
   }
 
-  /// Helper: جرّب أكثر من Endpoint لنفس العملية (Fallback)
-  static Future<http.Response> _getWithFallback(
-    List<String> paths, {
-    bool withAuth = false,
-  }) async {
-    http.Response? last;
-    for (final p in paths) {
-      final res = await _get(p, withAuth: withAuth);
-      last = res;
-      if (!_isNotFound(res)) return res;
-    }
-    return last ?? http.Response("Not Found", 404);
-  }
-
-  static Future<http.Response> _postWithFallback(
-    List<String> paths, {
-    bool withAuth = false,
-    Map<String, dynamic>? body,
-  }) async {
-    http.Response? last;
-    for (final p in paths) {
-      final res = await _post(p, withAuth: withAuth, body: body);
-      last = res;
-      if (!_isNotFound(res)) return res;
-    }
-    return last ?? http.Response("Not Found", 404);
-  }
-
-  static Future<http.Response> _putWithFallback(
-    List<String> paths, {
-    bool withAuth = false,
-    Map<String, dynamic>? body,
-  }) async {
-    http.Response? last;
-    for (final p in paths) {
-      final res = await _put(p, withAuth: withAuth, body: body);
-      last = res;
-      if (!_isNotFound(res)) return res;
-    }
-    return last ?? http.Response("Not Found", 404);
-  }
-
-  static Future<http.Response> _deleteWithFallback(
-    List<String> paths, {
-    bool withAuth = false,
-  }) async {
-    http.Response? last;
-    for (final p in paths) {
-      final res = await _delete(p, withAuth: withAuth);
-      last = res;
-      if (!_isNotFound(res)) return res;
-    }
-    return last ?? http.Response("Not Found", 404);
-  }
-
   // ====================== Auth ======================
 
-  /// 🔐 تسجيل الدخول
-  /// ✅ Endpoint الصحيح عندك: POST /api/login
-  /// وبما أن baseUrl يحتوي /api => هنا نستخدم "/login"
+  /// ✅ POST /api/login
   static Future<Map<String, dynamic>?> login(String email, String password) async {
     try {
       final res = await _post(
         "/login",
         body: {"email": email, "password": password},
       );
-
-      // ignore: avoid_print
-      print("🔐 login status: ${res.statusCode}");
-      // ignore: avoid_print
-      print("🔐 login body: ${res.body}");
 
       final data = _tryDecode(res.body);
 
@@ -239,8 +248,7 @@ class ApiService {
         }
 
         final role = _pickString(map, ["role", "Role"]) ?? "";
-        final name =
-            _pickString(map, ["fullName", "FullName", "name", "Name"]) ?? "";
+        final name = _pickString(map, ["fullName", "FullName", "name", "Name"]) ?? "";
         final userId = _pickInt(map, ["userId", "UserId", "id", "Id"]);
 
         await saveUserInfo(role: role, name: name, userId: userId);
@@ -255,41 +263,49 @@ class ApiService {
 
       return null;
     } on TimeoutException {
-      // ignore: avoid_print
-      print("Login timeout");
       return null;
-    } catch (e) {
-      // ignore: avoid_print
-      print("Login error: $e");
+    } catch (_) {
       return null;
     }
   }
 
-  Map<String, String> _splitName(String fullName) {
-    final parts = fullName
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .toList();
-
+  static Map<String, String> _splitName(String fullName) {
+    final parts =
+        fullName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.isEmpty) return {'firstName': '', 'lastName': ''};
-    if (parts.length == 1) {
-      return {'firstName': parts.first, 'lastName': parts.first};
-    }
-    return {
-      'firstName': parts.first,
-      'lastName': parts.sublist(1).join(' '),
-    };
+    if (parts.length == 1) return {'firstName': parts.first, 'lastName': parts.first};
+    return {'firstName': parts.first, 'lastName': parts.sublist(1).join(' ')};
   }
 
-  /// 🧾 إنشاء حساب جديد
-  /// ✅ Endpoint الصحيح عندك: POST /api/register
-  /// وبما أن baseUrl يحتوي /api => هنا نستخدم "/register"
-  ///
-  /// ✅ يدعم طريقتين:
-  /// 1) fullName (للشاشات القديمة)
-  /// 2) firstName + lastName (+ باقي الحقول)
+  /// ✅ POST /api/register
+  /// قديم: يرجع bool (حتى لا تنكسر ملفاتك)
   static Future<bool> register({
+    String? fullName,
+    String? firstName,
+    String? lastName,
+    required String email,
+    required String password,
+    String? nationalId,
+    String? phoneNumber,
+    String role = "Patient",
+    String? specialty,
+  }) async {
+    final res = await registerDetailed(
+      fullName: fullName,
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+      password: password,
+      nationalId: nationalId,
+      phoneNumber: phoneNumber,
+      role: role,
+      specialty: specialty,
+    );
+    return res != null;
+  }
+
+  /// ✅ نسخة “تفصيلية” (جديدة) ترجع Response Map إذا احتجتها
+  static Future<Map<String, dynamic>?> registerDetailed({
     String? fullName,
     String? firstName,
     String? lastName,
@@ -305,95 +321,73 @@ class ApiService {
       String ln = (lastName ?? '').trim();
 
       if ((fn.isEmpty || ln.isEmpty) && (fullName ?? '').trim().isNotEmpty) {
-        final parts = ApiService()._splitName(fullName!.trim());
+        final parts = _splitName(fullName!.trim());
         fn = parts['firstName'] ?? fn;
         ln = parts['lastName'] ?? ln;
       }
 
+      if (fn.isEmpty || ln.isEmpty) return null;
+      if ((nationalId ?? '').trim().isEmpty) return null;
+      if ((phoneNumber ?? '').trim().isEmpty) return null;
+
       final body = <String, dynamic>{
-        "email": email,
+        "firstName": fn,
+        "lastName": ln,
+        "email": email.trim(),
         "password": password,
         "role": role,
+        "nationalId": nationalId!.trim(),
+        "phoneNumber": phoneNumber!.trim(),
       };
 
-      // ✅ أرسل الاسم بالطريقة المتاحة
-      if (fn.isNotEmpty && ln.isNotEmpty) {
-        body["firstName"] = fn;
-        body["lastName"] = ln;
-      } else if ((fullName ?? '').trim().isNotEmpty) {
-        body["fullName"] = fullName!.trim();
-      }
-
-      // ✅ حقول اختيارية
-      if ((nationalId ?? '').trim().isNotEmpty) body["nationalId"] = nationalId!.trim();
-      if ((phoneNumber ?? '').trim().isNotEmpty) body["phoneNumber"] = phoneNumber!.trim();
-
       final isDoctor = role.toLowerCase() == 'doctor';
-      if (isDoctor && (specialty ?? '').trim().isNotEmpty) {
+      if (isDoctor) {
+        if ((specialty ?? '').trim().isEmpty) return null;
         body["specialty"] = specialty!.trim();
       }
 
       final res = await _post("/register", body: body);
+      final data = _tryDecode(res.body);
 
-      // ignore: avoid_print
-      print("📦 Register status: ${res.statusCode}");
-      // ignore: avoid_print
-      print("📦 Register body: ${res.body}");
+      if ((res.statusCode == 200 || res.statusCode == 201) && data is Map) {
+        return Map<String, dynamic>.from(data);
+      }
+      if (data is Map) return Map<String, dynamic>.from(data);
 
-      return res.statusCode == 200 || res.statusCode == 201;
-    } catch (e) {
-      // ignore: avoid_print
-      print("⚠️ Register error: $e");
-      return false;
+      return null;
+    } catch (_) {
+      return null;
     }
   }
 
+  /// ✅ POST /api/password/forgot
   static Future<bool> forgotPassword(String email) async {
     try {
-      final res = await _postWithFallback(
-        const ["/password/forgot"],
-        body: {"email": email},
-      );
+      final res = await _post("/password/forgot", body: {"email": email.trim()});
       return res.statusCode == 200;
-    } catch (e) {
-      // ignore: avoid_print
-      print("forgotPassword error: $e");
+    } catch (_) {
       return false;
     }
   }
 
+  /// ✅ PUT /api/password/change (Auth)
   static Future<bool> changePassword(String oldPass, String newPass) async {
     await loadToken();
     if (token == null) return false;
 
     try {
-      final res = await _putWithFallback(
-        const ["/password/change"],
+      final res = await _put(
+        "/password/change",
         withAuth: true,
         body: {"oldPassword": oldPass, "newPassword": newPass},
       );
       return res.statusCode == 200 || res.statusCode == 204;
-    } catch (e) {
-      // ignore: avoid_print
-      print("changePassword error: $e");
+    } catch (_) {
       return false;
     }
   }
 
-  static Future<bool> resetPassword(String email, String newPassword) async {
-    try {
-      final res = await _postWithFallback(
-        const ["/password/reset"],
-        body: {"email": email, "newPassword": newPassword},
-      );
-      return res.statusCode == 200;
-    } catch (e) {
-      // ignore: avoid_print
-      print("resetPassword error: $e");
-      return false;
-    }
-  }
-
+  /// ✅ POST /api/password/reset
   static Future<bool> resetPasswordWithCode({
     required String email,
     required String code,
@@ -402,58 +396,75 @@ class ApiService {
     try {
       final res = await _post(
         "/password/reset",
-        body: {
-          "email": email,
-          "code": code,
-          "newPassword": newPassword,
-        },
+        body: {"email": email.trim(), "code": code.trim(), "newPassword": newPassword},
       );
       return res.statusCode == 200;
-    } catch (e) {
-      // ignore: avoid_print
-      print("resetPasswordWithCode error: $e");
+    } catch (_) {
       return false;
     }
   }
 
+  /// ✅ Compatibility (كان عندك)
+  static Future<bool> resetPassword(
+    String email,
+    String newPassword, {
+    String? code,
+  }) async {
+    if ((code ?? '').trim().isEmpty) return false;
+    return resetPasswordWithCode(email: email, code: code!.trim(), newPassword: newPassword);
+  }
+
   // ==================== Doctors =====================
 
+  /// ✅ GET /api/doctors
   static Future<List<dynamic>> getDoctors() async {
     try {
       final res = await _get("/doctors");
-      // ignore: avoid_print
-      print("👩‍⚕️ getDoctors status: ${res.statusCode}");
-
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
-        if (data is List) return data;
-        if (data is Map && data['items'] is List) return List<dynamic>.from(data['items']);
+        return _extractList(data);
       }
       return [];
-    } catch (e) {
-      // ignore: avoid_print
-      print("getDoctors error: $e");
+    } catch (_) {
       return [];
     }
   }
 
-  // ✅✅ Alias (إن احتجته)
   static Future<List<Map<String, dynamic>>> getAllDoctors() async {
     final list = await getDoctors();
     return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
-  static Future<List<Map<String, dynamic>>> getAllPatients() async {
-    final users = await getAllUsers();
-    return users
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .where((u) => (u['role'] ?? '').toString().toLowerCase() == 'patient')
-        .toList();
+  /// ✅ GET /api/doctors/{doctorId}/available-slots?date=yyyy-MM-dd
+  static Future<List<dynamic>> getDoctorAvailableSlots({
+    required int doctorId,
+    required DateTime date,
+  }) async {
+    try {
+      final yyyy = date.year.toString().padLeft(4, '0');
+      final mm = date.month.toString().padLeft(2, '0');
+      final dd = date.day.toString().padLeft(2, '0');
+      final dateStr = "$yyyy-$mm-$dd";
+
+      final res = await _get(
+        "/doctors/$doctorId/available-slots",
+        query: {"date": dateStr},
+      );
+
+      if (res.statusCode == 200) {
+        final data = _tryDecode(res.body);
+        return _extractList(data);
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
   }
 
   // ================= Appointments ===================
 
+  /// ✅ POST /api/appointments/book
+  /// قديم: يرجع bool حتى لا تنكسر ملفاتك
   static Future<bool> bookAppointment({
     required dynamic doctorId,
     required DateTime startsAt,
@@ -462,8 +473,8 @@ class ApiService {
     await loadToken();
     if (token == null) return false;
 
-    final int? id = int.tryParse(doctorId.toString());
-    if (id == null) return false;
+    final int id = _safeInt(doctorId);
+    if (id <= 0) return false;
 
     try {
       final res = await _post(
@@ -476,71 +487,91 @@ class ApiService {
         },
       );
 
-      // ignore: avoid_print
-      print("📅 bookAppointment status: ${res.statusCode}");
-      // ignore: avoid_print
-      print("📅 bookAppointment body: ${res.body}");
-
       return res.statusCode == 200 || res.statusCode == 201;
-    } catch (e) {
-      // ignore: avoid_print
-      print("bookAppointment error: $e");
+    } catch (_) {
       return false;
     }
   }
 
+  /// ✅ نسخة تفصيلية ترجع Map (جديدة) إذا احتجتها لاحقاً
+  static Future<Map<String, dynamic>?> bookAppointmentDetailed({
+    required int doctorId,
+    required DateTime startsAt,
+    required DateTime endsAt,
+  }) async {
+    await loadToken();
+    if (token == null) return null;
+
+    try {
+      final res = await _post(
+        "/appointments/book",
+        withAuth: true,
+        body: {
+          "doctorId": doctorId,
+          "startsAt": startsAt.toIso8601String(),
+          "endsAt": endsAt.toIso8601String(),
+        },
+      );
+
+      final data = _tryDecode(res.body);
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// ✅ GET /api/appointments/mine
   static Future<List<dynamic>> getMyAppointments() async {
     await loadToken();
     if (token == null) return [];
 
     try {
       final res = await _get("/appointments/mine", withAuth: true);
-
-      // ignore: avoid_print
-      print("📋 getMyAppointments status: ${res.statusCode}");
-
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
-        if (data is List) return data;
-        if (data is Map && data['items'] is List) return List<dynamic>.from(data['items']);
+        return _extractList(data);
       }
       return [];
-    } catch (e) {
-      // ignore: avoid_print
-      print("getMyAppointments error: $e");
+    } catch (_) {
       return [];
     }
   }
 
+  /// ✅ GET /api/doctor/appointments
   static Future<List<dynamic>> getDoctorAppointments() async {
     await loadToken();
     if (token == null) return [];
 
     try {
       final res = await _get("/doctor/appointments", withAuth: true);
-
-      // ignore: avoid_print
-      print("📦 Doctor appointments status: ${res.statusCode}");
-
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
-        if (data is List) return data;
-        if (data is Map && data['appointments'] is List) {
-          return List<dynamic>.from(data['appointments']);
-        }
-        if (data is Map && data['items'] is List) {
-          return List<dynamic>.from(data['items']);
-        }
+        return _extractList(data);
       }
       return [];
-    } catch (e) {
-      // ignore: avoid_print
-      print("⚠️ getDoctorAppointments error: $e");
+    } catch (_) {
       return [];
     }
   }
 
-  static String _normalizeStatus(String s) {
+  // ===== Status normalize (supports int or String) =====
+
+  static String _statusFromAny(dynamic v) {
+    if (v is int) {
+      switch (v) {
+        case 0:
+          return 'Pending';
+        case 1:
+          return 'Confirmed';
+        case 2:
+          return 'Rejected';
+        default:
+          return 'Pending';
+      }
+    }
+    final s = (v ?? '').toString().trim();
+    if (s.isEmpty) return 'Pending';
     final lower = s.toLowerCase();
     if (lower == 'confirmed' || lower == 'accepted') return 'Confirmed';
     if (lower == 'rejected') return 'Rejected';
@@ -548,200 +579,389 @@ class ApiService {
     return s;
   }
 
-  /// ✅ مطابق للباك-اند: PUT /api/appointments/{id}/status
-  static Future<bool> updateAppointmentStatus(dynamic id, String status) async {
+  /// ✅ PUT /api/appointments/{id}/status
+  /// Body: { "status": "Confirmed" }
+  ///
+  /// ⭐ ثابت ومتوافق: يقبل status String أو int
+  /// ويرسل للباك String دائمًا.
+  static Future<bool> updateAppointmentStatus(dynamic id, dynamic status) async {
     await loadToken();
     if (token == null) return false;
 
-    final int? intId = int.tryParse(id.toString());
-    if (intId == null) return false;
+    final int intId = _safeInt(id);
+    if (intId <= 0) return false;
+
+    // status could be int or string
+    final String statusText = _statusFromAny(status);
 
     try {
       final res = await _put(
         "/appointments/$intId/status",
         withAuth: true,
-        body: {"status": _normalizeStatus(status)},
+        body: {"status": statusText},
       );
-
-      // ignore: avoid_print
-      print("🔄 updateAppointmentStatus [$intId] => ${res.statusCode}");
       return res.statusCode == 200 || res.statusCode == 204;
-    } catch (e) {
-      // ignore: avoid_print
-      print("updateAppointmentStatus error: $e");
+    } catch (_) {
       return false;
     }
   }
 
-  // ================= Admin: Doctors approvals =================
+  // ================= Wallet =================
 
-  static Future<List<Map<String, dynamic>>> getPendingDoctors() async {
+  /// ✅ GET /api/wallet/mine
+  static Future<Map<String, dynamic>?> getMyWallet() async {
+    await loadToken();
+    if (token == null) return null;
+
+    try {
+      final res = await _get("/wallet/mine", withAuth: true);
+      if (res.statusCode == 200) {
+        final data = _tryDecode(res.body);
+        if (data is Map) return Map<String, dynamic>.from(data);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// ✅ GET /api/wallet/transactions
+  static Future<List<dynamic>> getWalletTransactions() async {
     await loadToken();
     if (token == null) return [];
 
     try {
-      final res = await _get("/admin/doctors/pending", withAuth: true);
-
+      final res = await _get("/wallet/transactions", withAuth: true);
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
-        if (data is List) {
-          return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
-        }
-        if (data is Map && data['items'] is List) {
-          return List<dynamic>.from(data['items'])
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
-        }
+        return _extractList(data);
       }
-    } catch (e) {
-      // ignore: avoid_print
-      print("getPendingDoctors error: $e");
-    }
-
-    return [];
-  }
-
-  static Future<bool> approveDoctor(int doctorId) async {
-    await loadToken();
-    if (token == null) return false;
-
-    try {
-      final res = await _put("/admin/doctors/$doctorId/approve", withAuth: true);
-      return res.statusCode == 200 || res.statusCode == 204;
-    } catch (e) {
-      // ignore: avoid_print
-      print("approveDoctor error: $e");
-      return false;
+      return [];
+    } catch (_) {
+      return [];
     }
   }
 
-  static Future<bool> rejectDoctor(int doctorId) async {
+  // ================= Payments =================
+
+  /// ✅ POST /api/payments/checkout
+  /// method: "wallet" | "card"
+  /// (نقبل "visa" أيضاً للتوافق ونحوّلها إلى "card")
+  ///
+  /// ✅ تعديل مهم: نضمن وجود statusCode في كل الحالات
+  static Future<Map<String, dynamic>?> checkoutPayment({
+    required int appointmentId,
+    required String method, // wallet/card/visa
+    String? cardName,
+    String? cardNumber,
+    String? cardExp,
+    String? cardCvv,
+  }) async {
     await loadToken();
-    if (token == null) return false;
+    if (token == null) return null;
+
+    String m = method.trim().toLowerCase();
+    if (m == 'visa') m = 'card';
 
     try {
-      final res = await _put("/admin/doctors/$doctorId/reject", withAuth: true);
-      return res.statusCode == 200 || res.statusCode == 204;
-    } catch (e) {
-      // ignore: avoid_print
-      print("rejectDoctor error: $e");
-      return false;
-    }
-  }
-
-  // ================= Admin: Users management =================
-
-  static Future<bool> setUserActive(int userId, bool isActive) async {
-    await loadToken();
-    if (token == null) return false;
-
-    try {
-      final res = await _put(
-        "/admin/users/$userId/set-active",
+      final res = await _post(
+        "/payments/checkout",
         withAuth: true,
-        body: {"isActive": isActive},
+        body: {
+          "appointmentId": appointmentId,
+          "method": m,
+          "cardName": cardName,
+          "cardNumber": cardNumber,
+          "cardExp": cardExp,
+          "cardCvv": cardCvv,
+        },
       );
-      return res.statusCode == 200 || res.statusCode == 204;
-    } catch (e) {
-      // ignore: avoid_print
-      print("setUserActive error: $e");
-      return false;
-    }
-  }
 
-  static Future<bool> softDeleteUser(int userId) async {
-    await loadToken();
-    if (token == null) return false;
-
-    try {
-      final res = await _delete("/admin/users/$userId", withAuth: true);
-      return res.statusCode == 200 || res.statusCode == 204;
-    } catch (e) {
-      // ignore: avoid_print
-      print("softDeleteUser error: $e");
-      return false;
-    }
-  }
-
-  // ================== Admin APIs ====================
-
-  static Future<List<dynamic>> getAdminAppointments() async {
-    await loadToken();
-    if (token == null) return [];
-
-    try {
-      final res = await _get("/admin/appointments", withAuth: true);
-
-      if (res.statusCode == 200) {
-        final data = _tryDecode(res.body);
-        if (data is List) return data;
-        if (data is Map && data['items'] is List) return List<dynamic>.from(data['items']);
-      }
-      return [];
-    } catch (e) {
-      // ignore: avoid_print
-      print("getAdminAppointments error: $e");
-      return [];
-    }
-  }
-
-  static Future<List<dynamic>> getAllUsers() async {
-    await loadToken();
-    if (token == null) return [];
-
-    try {
-      final res = await _get("/admin/users", withAuth: true);
-
-      if (res.statusCode == 200) {
-        final data = _tryDecode(res.body);
-        if (data is List) return data;
-        if (data is Map && data['items'] is List) return List<dynamic>.from(data['items']);
-      }
-      return [];
-    } catch (e) {
-      // ignore: avoid_print
-      print("getAllUsers error: $e");
-      return [];
-    }
-  }
-
-  static Future<Map<String, dynamic>> getAdminStats() async {
-    await loadToken();
-    if (token == null) {
-      return {
-        "appointments": 0,
-        "confirmed": 0,
-        "rejected": 0,
-        "pending": 0,
-        "doctors": 0,
-        "patients": 0,
-      };
-    }
-
-    try {
-      final res = await _get("/admin/stats", withAuth: true);
       final data = _tryDecode(res.body);
 
-      if (res.statusCode == 200 && data is Map) {
-        return Map<String, dynamic>.from(data);
+      if (data is Map) {
+        final map = Map<String, dynamic>.from(data);
+        map["statusCode"] = res.statusCode;
+        return map;
+      }
+
+      return {"statusCode": res.statusCode, "raw": res.body};
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// ✅ للتوافق مع الشاشات التي تتوقع bool بدل Map
+  static Future<bool> checkoutPaymentOk({
+    required int appointmentId,
+    required String method,
+    String? cardName,
+    String? cardNumber,
+    String? cardExp,
+    String? cardCvv,
+  }) async {
+    final res = await checkoutPayment(
+      appointmentId: appointmentId,
+      method: method,
+      cardName: cardName,
+      cardNumber: cardNumber,
+      cardExp: cardExp,
+      cardCvv: cardCvv,
+    );
+
+    final code = res?["statusCode"];
+    if (code is int) return code == 200 || code == 201;
+
+    if (res?["success"] == true) return true;
+    final st = (res?["status"] ?? "").toString().toLowerCase();
+    if (st == "success" || st == "ok") return true;
+
+    return false;
+  }
+
+  // ================= Doctor Rating =================
+
+  /// ✅ POST /api/doctor-ratings
+  static Future<bool> submitDoctorRating({
+    required int appointmentId,
+    required int stars,
+    String? comment,
+  }) async {
+    await loadToken();
+    if (token == null) return false;
+
+    try {
+      final res = await _post(
+        "/doctor-ratings",
+        withAuth: true,
+        body: {"appointmentId": appointmentId, "stars": stars, "comment": comment},
+      );
+      return res.statusCode == 200 || res.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ================= Doctor Profile =================
+
+  /// ✅ PUT /api/doctor/profile
+  static Future<bool> updateDoctorProfile(Map<String, dynamic> data) async {
+    await loadToken();
+    if (token == null) return false;
+
+    try {
+      final res = await _put("/doctor/profile", withAuth: true, body: data);
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// (قديمة) GET غير موجودة في Swagger، نخليها fallback للتوافق
+  static Future<DoctorProfile> getDoctorProfile() async {
+    await loadToken();
+
+    // Try if exists in your backend later:
+    try {
+      final res = await http
+          .get(_url('/doctor/profile'), headers: _authHeaders())
+          .timeout(_timeout);
+      if (res.statusCode == 200) {
+        return DoctorProfile.fromJson(jsonDecode(res.body));
       }
     } catch (_) {}
 
-    return {
-      "appointments": 0,
-      "confirmed": 0,
-      "rejected": 0,
-      "pending": 0,
-      "doctors": 0,
-      "patients": 0,
-    };
+    // fallback: from /doctors
+    final all = await getAllDoctors();
+    if (all.isNotEmpty) {
+      final int? userId = await _loadUserId();
+      Map<String, dynamic>? found;
+
+      if (userId != null) {
+        for (final d in all) {
+          final uid = _pickInt(d, ['userId', 'UserId', 'doctorUserId', 'DoctorUserId']);
+          if (uid != null && uid == userId) {
+            found = d;
+            break;
+          }
+        }
+
+        // As a very last resort, match id ONLY if no explicit userId keys exist
+        if (found == null) {
+          for (final d in all) {
+            if (_hasAnyKey(d, ['userId', 'UserId', 'doctorUserId', 'DoctorUserId'])) {
+              continue;
+            }
+            final id = _pickInt(d, ['id', 'Id']);
+            if (id != null && id == userId) {
+              found = d;
+              break;
+            }
+          }
+        }
+      }
+
+      // If still not found, only return a single doctor to avoid wrong data
+      final selected = found ?? (all.length == 1 ? all.first : null);
+      if (selected != null) {
+        final normalized = Map<String, dynamic>.from(selected);
+        final altUserId = _pickInt(normalized, ['UserId', 'doctorUserId', 'DoctorUserId']);
+        if ((_safeInt(normalized['userId']) <= 0) && altUserId != null) {
+          normalized['userId'] = altUserId;
+        }
+        return DoctorProfile.fromJson(normalized);
+      }
+    }
+
+    throw Exception('Doctor profile endpoint not available yet.');
+  }
+
+  /// (قديمة) GET /doctors/{id} غير موجودة في Swagger غالباً، نخليها fallback
+  static Future<DoctorProfile> getDoctorDetails(int doctorId) async {
+    try {
+      final res = await http.get(_url('/doctors/$doctorId')).timeout(_timeout);
+      if (res.statusCode == 200) {
+        return DoctorProfile.fromJson(jsonDecode(res.body));
+      }
+    } catch (_) {}
+
+    final all = await getAllDoctors();
+    final found = all.firstWhere(
+      (d) {
+        final id = _pickInt(d, ['doctorId', 'DoctorId', 'id', 'Id']);
+        return id != null && id == doctorId;
+      },
+      orElse: () => <String, dynamic>{},
+    );
+
+    if (found.isNotEmpty) return DoctorProfile.fromJson(found);
+    throw Exception('Doctor not found');
+  }
+
+  // ================= Doctor Patients =================
+
+  /// ✅ GET /api/doctor/patients
+  static Future<List<dynamic>> getDoctorPatients() async {
+    await loadToken();
+    if (token == null) return [];
+
+    try {
+      final res = await _get("/doctor/patients", withAuth: true);
+      if (res.statusCode == 200) {
+        final data = _tryDecode(res.body);
+        return _extractList(data);
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// ✅ Compatibility: derive patients list from /doctor/appointments
+  /// Returns: List of { id, fullName, phoneNumber }
+  static Future<List<Map<String, dynamic>>> getPatientsFromDoctorAppointments() async {
+    final apps = await getDoctorAppointments();
+    if (apps.isEmpty) return [];
+
+    final Map<int, Map<String, dynamic>> byId = {};
+
+    for (final a in apps) {
+      if (a is! Map) continue;
+
+      final patientObj = a['patient'];
+      int id = 0;
+      String name = '';
+      String? phone;
+
+      if (patientObj is Map) {
+        id = _pickInt(patientObj, ['id', 'Id', 'patientId', 'PatientId']) ?? 0;
+        name = _pickString(
+              patientObj,
+              ['fullName', 'FullName', 'name', 'Name', 'patientName', 'PatientName'],
+            ) ??
+            '';
+        phone = _pickString(patientObj, ['phoneNumber', 'PhoneNumber', 'phone', 'Phone']);
+      }
+
+      if (id <= 0) {
+        id = _safeInt(a['patientId']);
+      }
+
+      if (name.trim().isEmpty) {
+        name = _pickString(a, ['patientName', 'fullName', 'name']) ?? '';
+      }
+
+      if ((phone ?? '').trim().isEmpty) {
+        phone = _pickString(a, ['patientPhone', 'phoneNumber', 'phone']);
+      }
+
+      if (id <= 0) continue;
+
+      // Merge with existing entry if we already saw this patient
+      final existing = byId[id];
+      if (existing == null) {
+        byId[id] = {
+          'id': id,
+          'fullName': name.trim().isEmpty ? 'Patient' : name.trim(),
+          'phoneNumber': (phone ?? '').trim().isEmpty ? null : phone!.trim(),
+        };
+      } else {
+        if ((existing['fullName'] ?? '').toString().trim().isEmpty &&
+            name.trim().isNotEmpty) {
+          existing['fullName'] = name.trim();
+        }
+        if ((existing['phoneNumber'] ?? '').toString().trim().isEmpty &&
+            (phone ?? '').trim().isNotEmpty) {
+          existing['phoneNumber'] = phone!.trim();
+        }
+      }
+    }
+
+    return byId.values.toList();
+  }
+
+  // ================= Doctor Working Hours =================
+
+  /// ✅ GET /api/doctor/working-hours
+  static Future<List<dynamic>> getDoctorWorkingHours() async {
+    await loadToken();
+    if (token == null) return [];
+
+    try {
+      final res = await _get("/doctor/working-hours", withAuth: true);
+      if (res.statusCode == 200) {
+        final data = _tryDecode(res.body);
+        return _extractList(data);
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// ✅ PUT /api/doctor/working-hours (List body)
+  static Future<bool> updateDoctorWorkingHours(List<Map<String, dynamic>> items) async {
+    await loadToken();
+    if (token == null) return false;
+
+    try {
+      final res = await _putAny("/doctor/working-hours", withAuth: true, body: items);
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (_) {
+      return false;
+    }
   }
 
   // ================= Medical Records =================
 
+  /// ✅ POST /api/medical-records
+  ///
+  /// ✅ تعديل مهم جداً للتوافق:
+  /// appointmentId صار OPTIONAL لأن بعض شاشاتك تستدعيه بدون appointmentId
+  /// وسنرسله للباك فقط لو كان موجود.
   static Future<bool> createMedicalRecord({
     required int patientId,
+    int? appointmentId,
     required String diagnosis,
     required String notes,
     String? medication,
@@ -752,27 +972,28 @@ class ApiService {
     if (token == null) return false;
 
     try {
-      final res = await _post(
-        "/medical-records",
-        withAuth: true,
-        body: {
-          "patientId": patientId,
-          "diagnosis": diagnosis,
-          "notes": notes,
-          "medication": medication,
-          "allergies": allergies,
-          "sideEffects": sideEffects,
-        },
-      );
+      final body = <String, dynamic>{
+        "patientId": patientId,
+        "diagnosis": diagnosis,
+        "notes": notes,
+        "medication": medication,
+        "allergies": allergies,
+        "sideEffects": sideEffects,
+      };
 
+      // ✅ لا نرسل appointmentId إلا إذا كان موجود
+      if (appointmentId != null) {
+        body["appointmentId"] = appointmentId;
+      }
+
+      final res = await _post("/medical-records", withAuth: true, body: body);
       return res.statusCode == 200 || res.statusCode == 201;
-    } catch (e) {
-      // ignore: avoid_print
-      print("createMedicalRecord error: $e");
+    } catch (_) {
       return false;
     }
   }
 
+  /// ✅ PUT /api/medical-records/{id}
   static Future<bool> updateMedicalRecord({
     required int recordId,
     required String diagnosis,
@@ -796,230 +1017,93 @@ class ApiService {
           "sideEffects": sideEffects,
         },
       );
-
       return res.statusCode == 200 || res.statusCode == 204;
-    } catch (e) {
-      // ignore: avoid_print
-      print("updateMedicalRecord error: $e");
+    } catch (_) {
       return false;
     }
   }
 
+  /// ✅ GET /api/medical-records/patient/{patientId}
   static Future<List<dynamic>> getMedicalRecordsForPatient(int patientId) async {
     await loadToken();
     if (token == null) return [];
 
     try {
-      final res = await _get(
-        "/medical-records/patient/$patientId",
-        withAuth: true,
-      );
-
+      final res = await _get("/medical-records/patient/$patientId", withAuth: true);
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
-        if (data is List) return data;
-        if (data is Map && data['items'] is List) return List<dynamic>.from(data['items']);
+        return _extractList(data);
       }
       return [];
-    } catch (e) {
-      // ignore: avoid_print
-      print("getMedicalRecordsForPatient error: $e");
+    } catch (_) {
       return [];
     }
   }
 
+  /// ✅ GET /api/medical-records/mine
   static Future<List<dynamic>> getMyMedicalRecords() async {
     await loadToken();
     if (token == null) return [];
 
     try {
       final res = await _get("/medical-records/mine", withAuth: true);
-
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
-        if (data is List) return data;
-        if (data is Map && data['items'] is List) return List<dynamic>.from(data['items']);
+        return _extractList(data);
       }
       return [];
-    } catch (e) {
-      // ignore: avoid_print
-      print("getMyMedicalRecords error: $e");
+    } catch (_) {
       return [];
     }
   }
 
-  // ================= Compatibility APIs =================
-
-  /// ✅ Compatibility: بعض الشاشات تستدعي هذا الاسم
+  /// Compatibility
   static Future<List<dynamic>> getPatientMedicalRecords(int patientId) async {
     return getMedicalRecordsForPatient(patientId);
   }
 
-  /// ⚠️ ملاحظة مهمة:
-  /// حسب قائمة endpoints التي أرسلتها: لا يوجد DELETE لإلغاء الموعد.
-  /// هذه الدالة ستُرجع false غالباً (404) إلا إذا عندك endpoint مخفي.
-  static Future<bool> cancelAppointment(dynamic id) async {
-    await loadToken();
-    if (token == null) return false;
-
-    final int? intId = int.tryParse(id.toString());
-    if (intId == null) return false;
-
-    try {
-      final res = await _deleteWithFallback(
-        [
-          "/appointments/$intId",
-          "/appointments/$intId/cancel",
-          "/doctor/appointments/$intId",
-        ],
-        withAuth: true,
-      );
-
-      return res.statusCode == 200 || res.statusCode == 204;
-    } catch (e) {
-      // ignore: avoid_print
-      print("cancelAppointment error: $e");
-      return false;
-    }
-  }
-
-  // ================= Doctor Patients Helper =================
-
-  static Future<List<Map<String, dynamic>>> getPatientsFromDoctorAppointments() async {
-    final apps = await getDoctorAppointments();
-    final Map<int, Map<String, dynamic>> unique = {};
-
-    for (final a in apps) {
-      if (a is! Map) continue;
-
-      final patient = a['patient'];
-      if (patient is Map) {
-        final id = int.tryParse(patient['id']?.toString() ?? '');
-        if (id == null) continue;
-
-        unique[id] = {
-          "id": id,
-          "fullName": patient['fullName']?.toString() ?? "Patient",
-          "phoneNumber": patient['phoneNumber']?.toString(),
-        };
-      } else {
-        final pid = int.tryParse(a['patientId']?.toString() ?? '');
-        if (pid == null) continue;
-
-        unique[pid] = {
-          "id": pid,
-          "fullName": a['patientName']?.toString() ?? "Patient",
-        };
-      }
-    }
-
-    return unique.values.toList();
-  }
-  static Future<DoctorProfile> getDoctorProfile() async {
-  final res = await http.get(
-    Uri.parse('$baseUrl/doctor/profile'),
-    headers: _authHeaders(),
-  );
-
-  if (res.statusCode == 200) {
-    return DoctorProfile.fromJson(jsonDecode(res.body));
-  } else {
-    throw Exception('Failed to load doctor profile');
-  }
-  }
-  static Future<bool> updateDoctorProfile(Map<String, dynamic> data) async {
-  final res = await http.put(
-    Uri.parse('$baseUrl/doctor/profile'),
-    headers: _authHeaders(),
-    body: jsonEncode(data),
-  );
-
-  return res.statusCode == 200;
-}
-static Future<DoctorProfile> getDoctorDetails(int doctorId) async {
-  final res = await http.get(
-    Uri.parse('$baseUrl/doctors/$doctorId'),
-  );
-
-  if (res.statusCode == 200) {
-    return DoctorProfile.fromJson(jsonDecode(res.body));
-  } else {
-    throw Exception('Doctor not found');
-  }
-}
-
-  static Future<List<dynamic>> getDoctorPatients() async {
-    await loadToken();
-    if (token == null) return [];
-
-    try {
-      final res = await _getWithFallback(
-        const ["/doctor/patients"],
-        withAuth: true,
-      );
-
-      if (res.statusCode == 200) {
-        final data = _tryDecode(res.body);
-        if (data is List) return data;
-        if (data is Map && data['items'] is List) return List<dynamic>.from(data['items']);
-      }
-    } catch (e) {
-      // ignore: avoid_print
-      print("getDoctorPatients error: $e");
-    }
-    return [];
-  }
-
   // ================= Notifications =================
 
+  /// ✅ GET /api/notifications/mine
   static Future<List<dynamic>> getMyNotifications() async {
     await loadToken();
     if (token == null) return [];
 
     try {
       final res = await _get("/notifications/mine", withAuth: true);
-
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
-        if (data is List) return data;
-        if (data is Map && data['items'] is List) {
-          return List<dynamic>.from(data['items']);
-        }
+        return _extractList(data);
       }
       return [];
-    } catch (e) {
-      // ignore: avoid_print
-      print("getMyNotifications error: $e");
+    } catch (_) {
       return [];
     }
   }
 
+  /// ✅ GET /api/notifications/unread-count  => { unread: 3 }
   static Future<int> getUnreadCount() async {
     await loadToken();
     if (token == null) return 0;
 
     try {
       final res = await _get("/notifications/unread-count", withAuth: true);
-
       if (res.statusCode == 200) {
         final data = _tryDecode(res.body);
-
+        if (data is Map) {
+          final v = data['unread'] ?? data['count'];
+          return int.tryParse(v?.toString() ?? '') ?? 0;
+        }
         if (data is int) return data;
         if (data is String) return int.tryParse(data) ?? 0;
-
-        if (data is Map) {
-          if (data['unread'] != null) return int.tryParse(data['unread'].toString()) ?? 0;
-          if (data['count'] != null) return int.tryParse(data['count'].toString()) ?? 0;
-        }
       }
       return 0;
-    } catch (e) {
-      // ignore: avoid_print
-      print("getUnreadCount error: $e");
+    } catch (_) {
       return 0;
     }
   }
 
+  /// ✅ PUT /api/notifications/{id}/read
   static Future<bool> markNotificationRead(int id) async {
     await loadToken();
     if (token == null) return false;
@@ -1027,13 +1111,12 @@ static Future<DoctorProfile> getDoctorDetails(int doctorId) async {
     try {
       final res = await _put("/notifications/$id/read", withAuth: true);
       return res.statusCode == 200 || res.statusCode == 204;
-    } catch (e) {
-      // ignore: avoid_print
-      print("markNotificationRead error: $e");
+    } catch (_) {
       return false;
     }
   }
 
+  /// ✅ PUT /api/notifications/read-all
   static Future<bool> markAllNotificationsRead() async {
     await loadToken();
     if (token == null) return false;
@@ -1041,9 +1124,177 @@ static Future<DoctorProfile> getDoctorDetails(int doctorId) async {
     try {
       final res = await _put("/notifications/read-all", withAuth: true);
       return res.statusCode == 200 || res.statusCode == 204;
-    } catch (e) {
-      // ignore: avoid_print
-      print("markAllNotificationsRead error: $e");
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ================= Admin =================
+
+  /// ✅ GET /api/admin/users
+  static Future<List<dynamic>> getAllUsers() async {
+    await loadToken();
+    if (token == null) return [];
+
+    try {
+      final res = await _get("/admin/users", withAuth: true);
+      if (res.statusCode == 200) {
+        final data = _tryDecode(res.body);
+        return _extractList(data);
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// ✅ GET /api/admin/doctors/pending
+  static Future<List<Map<String, dynamic>>> getPendingDoctors() async {
+    await loadToken();
+    if (token == null) return [];
+
+    try {
+      final res = await _get("/admin/doctors/pending", withAuth: true);
+      if (res.statusCode == 200) {
+        final data = _tryDecode(res.body);
+        final list = _extractList(data);
+        return list
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// ✅ PUT /api/admin/doctors/{doctorId}/approve
+  static Future<bool> approveDoctor(int doctorId) async {
+    await loadToken();
+    if (token == null) return false;
+
+    try {
+      final res = await _put("/admin/doctors/$doctorId/approve", withAuth: true);
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// ✅ PUT /api/admin/doctors/{doctorId}/reject
+  static Future<bool> rejectDoctor(int doctorId) async {
+    await loadToken();
+    if (token == null) return false;
+
+    try {
+      final res = await _put("/admin/doctors/$doctorId/reject", withAuth: true);
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// ✅ GET /api/admin/appointments
+  static Future<List<dynamic>> getAdminAppointments() async {
+    await loadToken();
+    if (token == null) return [];
+
+    try {
+      final res = await _get("/admin/appointments", withAuth: true);
+      if (res.statusCode == 200) {
+        final data = _tryDecode(res.body);
+        return _extractList(data);
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// ✅ PUT /api/admin/users/{id}/set-active
+  static Future<bool> setUserActive(int userId, bool isActive) async {
+    await loadToken();
+    if (token == null) return false;
+
+    try {
+      final res = await _put(
+        "/admin/users/$userId/set-active",
+        withAuth: true,
+        body: {"isActive": isActive},
+      );
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// ✅ DELETE /api/admin/users/{id}
+  static Future<bool> softDeleteUser(int userId) async {
+    await loadToken();
+    if (token == null) return false;
+
+    try {
+      final res = await _delete("/admin/users/$userId", withAuth: true);
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// ✅ GET /api/admin/stats
+  static Future<Map<String, dynamic>> getAdminStats() async {
+    await loadToken();
+    if (token == null) {
+      return {
+        "appointments": 0,
+        "confirmed": 0,
+        "rejected": 0,
+        "pending": 0,
+        "doctors": 0,
+        "patients": 0,
+      };
+    }
+
+    try {
+      final res = await _get("/admin/stats", withAuth: true);
+      final data = _tryDecode(res.body);
+      if (res.statusCode == 200 && data is Map) return Map<String, dynamic>.from(data);
+    } catch (_) {}
+
+    return {
+      "appointments": 0,
+      "confirmed": 0,
+      "rejected": 0,
+      "pending": 0,
+      "doctors": 0,
+      "patients": 0,
+    };
+  }
+
+  // ================= Extra Compatibility (keep) =================
+
+  static Future<List<Map<String, dynamic>>> getAllPatients() async {
+    final users = await getAllUsers();
+    return users
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .where((u) => (u['role'] ?? '').toString().toLowerCase() == 'patient')
+        .toList();
+  }
+
+  /// (قديم) Cancel ليس في Swagger، نخليه بدون كسر إن كان مستخدم في شاشات قديمة
+  static Future<bool> cancelAppointment(dynamic id) async {
+    await loadToken();
+    if (token == null) return false;
+
+    final int intId = _safeInt(id);
+    if (intId <= 0) return false;
+
+    try {
+      final res = await _delete("/appointments/$intId", withAuth: true);
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (_) {
       return false;
     }
   }
