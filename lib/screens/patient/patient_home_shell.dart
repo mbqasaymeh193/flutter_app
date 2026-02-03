@@ -3,6 +3,7 @@ import 'package:healthcare_flutter_app/services/api_service.dart';
 import 'package:healthcare_flutter_app/utils/nav.dart';
 import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
 import 'package:healthcare_flutter_app/widgets/notification_bell.dart';
+import 'package:healthcare_flutter_app/widgets/star_rating.dart';
 import 'patient_appointments_screen.dart';
 import '../main/appointment/book_appointment_screen.dart';
 
@@ -142,6 +143,19 @@ class _HomeTab extends StatelessWidget {
     required this.onBook,
   });
 
+  double _asDouble(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    return double.tryParse(v.toString()) ?? 0.0;
+  }
+
+  int _asInt(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    return int.tryParse(v.toString()) ?? 0;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (loading) {
@@ -158,6 +172,9 @@ class _HomeTab extends StatelessWidget {
         final d = doctors[i];
         final name = d['fullName'] ?? 'Doctor';
         final spec = d['specialty'] ?? '';
+        final avg = _asDouble(d['averageRating']);
+        final count = _asInt(d['ratingsCount']);
+        final hasRatings = count > 0;
         return Card(
           elevation: 3,
           margin: const EdgeInsets.only(bottom: 12),
@@ -173,7 +190,31 @@ class _HomeTab extends StatelessWidget {
             ),
             title:
                 Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text(spec.isEmpty ? '—' : spec),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(spec.isEmpty ? '—' : spec),
+                const SizedBox(height: 6),
+                if (hasRatings)
+                  StarRating(
+                    rating: avg,
+                    count: count,
+                    showValue: true,
+                    size: 16,
+                    spacing: 1,
+                    textStyle: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black54,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  )
+                else
+                  const Text(
+                    'بدون تقييم بعد',
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+              ],
+            ),
             trailing: FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF1976D2),
