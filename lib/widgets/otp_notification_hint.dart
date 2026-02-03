@@ -2,16 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:healthcare_flutter_app/services/api_service.dart';
+import 'package:healthcare_flutter_app/services/notification_store.dart';
 
 class OtpNotificationHint extends StatefulWidget {
   final ValueChanged<String>? onFill;
-  final Duration refreshInterval;
 
   const OtpNotificationHint({
     super.key,
     this.onFill,
-    this.refreshInterval = const Duration(seconds: 15),
   });
 
   @override
@@ -22,49 +20,48 @@ class _OtpNotificationHintState extends State<OtpNotificationHint> {
   String? _code;
   bool _visible = true;
   bool _loading = false;
-  Timer? _timer;
   Timer? _autoHide;
+  late final VoidCallback _itemsListener;
 
   @override
   void initState() {
     super.initState();
-    _load();
-    _timer = Timer.periodic(widget.refreshInterval, (_) => _load());
+    _itemsListener = _handleItemsChanged;
+    NotificationStore.instance.items.addListener(_itemsListener);
+    _handleItemsChanged();
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    NotificationStore.instance.items.removeListener(_itemsListener);
     _autoHide?.cancel();
     super.dispose();
   }
 
-  Future<void> _load() async {
-    if (_loading) return;
+  void _handleItemsChanged() {
+    if (!mounted) return;
     setState(() => _loading = true);
 
-    try {
-      final list = await ApiService.getMyNotifications();
-      if (!mounted) return;
+    final list = NotificationStore.instance.items.value;
+    final code = _extractLatestOtp(list);
+    if (code == null) {
+      setState(() {
+        _code = null;
+        _visible = false;
+        _loading = false;
+      });
+      return;
+    }
 
-      final code = _extractLatestOtp(list);
-      if (code == null) {
-        setState(() {
-          _code = null;
-          _visible = false;
-        });
-      } else if (code != _code) {
-        setState(() {
-          _code = code;
-          _visible = true;
-        });
-        _startAutoHide();
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _code = null);
-    } finally {
-      if (mounted) setState(() => _loading = false);
+    if (code != _code) {
+      setState(() {
+        _code = code;
+        _visible = true;
+        _loading = false;
+      });
+      _startAutoHide();
+    } else {
+      setState(() => _loading = false);
     }
   }
 

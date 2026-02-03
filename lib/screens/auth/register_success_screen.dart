@@ -23,11 +23,13 @@ class RegisterSuccessScreen extends StatefulWidget {
 
 class _RegisterSuccessScreenState extends State<RegisterSuccessScreen> {
   Timer? _timer;
+  Timer? _countdownTimer;
+  int _secondsLeft = 4;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer(const Duration(seconds: 2), () {
+    _timer = Timer(const Duration(seconds: 4), () {
       if (!mounted) return;
       Navigator.pushNamedAndRemoveUntil(
         context,
@@ -35,11 +37,20 @@ class _RegisterSuccessScreenState extends State<RegisterSuccessScreen> {
         (_) => false,
       );
     });
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      if (_secondsLeft <= 1) {
+        t.cancel();
+        return;
+      }
+      setState(() => _secondsLeft -= 1);
+    });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _countdownTimer?.cancel();
     super.dispose();
   }
 
@@ -101,8 +112,8 @@ class _RegisterSuccessScreenState extends State<RegisterSuccessScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 18),
-                const Text(
-                  'سيتم تحويلك تلقائيًا إلى صفحة تسجيل الدخول خلال ثانيتين.',
+                Text(
+                  'سيتم تحويلك تلقائيًا إلى صفحة تسجيل الدخول خلال $_secondsLeft ثوانٍ.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.black87),
                 ),
