@@ -1,45 +1,63 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
 
-class RegisterSuccessScreen extends StatelessWidget {
+class RegisterSuccessScreen extends StatefulWidget {
   final String? name;
   final String? role;
   final bool autoLoggedIn;
+  final String? message;
 
   const RegisterSuccessScreen({
     super.key,
     this.name,
     this.role,
-    this.autoLoggedIn = true,
+    this.autoLoggedIn = false,
+    this.message,
   });
 
-  void _goToHome(BuildContext context) {
-    final r = (role ?? '').toLowerCase();
-    if (r == 'doctor') {
+  @override
+  State<RegisterSuccessScreen> createState() => _RegisterSuccessScreenState();
+}
+
+class _RegisterSuccessScreenState extends State<RegisterSuccessScreen> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
       Navigator.pushNamedAndRemoveUntil(
         context,
-        AppRoutes.doctorDashboard,
+        AppRoutes.login,
         (_) => false,
       );
-    } else if (r == 'admin') {
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRoutes.adminDashboard,
-        (_) => false,
-      );
-    } else {
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRoutes.patientHomeShell,
-        (_) => false,
-      );
-    }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final displayName = (name == null || name!.trim().isEmpty) ? 'مرحبًا بك' : name!;
-    final displayRole = (role ?? 'Patient');
+    final displayName =
+        (widget.name == null || widget.name!.trim().isEmpty) ? 'مرحبًا بك' : widget.name!;
+    final displayRole = (widget.role ?? 'Patient');
+    final lowerRole = (widget.role ?? '').toLowerCase();
+
+    final String mainMessage;
+    if ((widget.message ?? '').trim().isNotEmpty) {
+      mainMessage = widget.message!.trim();
+    } else if (lowerRole == 'doctor') {
+      mainMessage = 'تم إنشاء حساب الطبيب بنجاح، وبانتظار موافقة الأدمن.';
+    } else {
+      mainMessage = 'تم إنشاء الحساب بنجاح.';
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FC),
@@ -68,8 +86,12 @@ class RegisterSuccessScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'تم إنشاء الحساب بنجاح ✅',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF0D47A1)),
+                  mainMessage,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0D47A1),
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 10),
@@ -78,37 +100,42 @@ class RegisterSuccessScreen extends StatelessWidget {
                   style: const TextStyle(fontSize: 14, color: Colors.black54),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 18),
                 const Text(
-                  'يمكنك الآن متابعة استخدام النظام. اضغط على الزر أدناه للانتقال إلى صفحتك الرئيسية.',
+                  'سيتم تحويلك تلقائيًا إلى صفحة تسجيل الدخول خلال ثانيتين.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.black87),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 22),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    icon: const Icon(Icons.arrow_forward_ios, size: 18),
-                    label: const Text('اذهب إلى صفحتي'),
+                    icon: const Icon(Icons.login, size: 18),
+                    label: const Text('الذهاب لتسجيل الدخول الآن'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF1976D2),
                       foregroundColor: Colors.white,
                       minimumSize: const Size(double.infinity, 48),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    onPressed: () => _goToHome(context),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (!autoLoggedIn)
-                  TextButton(
                     onPressed: () => Navigator.pushNamedAndRemoveUntil(
                       context,
                       AppRoutes.login,
                       (_) => false,
                     ),
-                    child: const Text('العودة إلى تسجيل الدخول'),
                   ),
+                ),
+                if (widget.autoLoggedIn) ...[
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      AppRoutes.patientHomeShell,
+                      (_) => false,
+                    ),
+                    child: const Text('الانتقال إلى الصفحة الرئيسية'),
+                  ),
+                ],
               ],
             ),
           ),

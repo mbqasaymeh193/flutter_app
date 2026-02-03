@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:healthcare_flutter_app/services/api_service.dart';
 import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
+import 'package:healthcare_flutter_app/widgets/otp_notification_hint.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
@@ -11,23 +12,45 @@ class ResetPasswordScreen extends StatefulWidget {
 
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _emailController = TextEditingController();
+  final _codeController = TextEditingController();
   final _newPasswordController = TextEditingController();
   bool _isLoading = false;
   bool _hidePassword = true;
+  bool _argsApplied = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_argsApplied) return;
+    _argsApplied = true;
+
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map) {
+      final email = args['email']?.toString().trim();
+      if ((email ?? '').isNotEmpty && _emailController.text.trim().isEmpty) {
+        _emailController.text = email!;
+      }
+    }
+  }
 
   Future<void> _reset() async {
     final email = _emailController.text.trim();
+    final code = _codeController.text.trim();
     final newPassword = _newPasswordController.text.trim();
 
-    if (email.isEmpty || newPassword.isEmpty) {
+    if (email.isEmpty || code.isEmpty || newPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يرجى إدخال البريد وكلمة المرور الجديدة')),
+        const SnackBar(content: Text('يرجى إدخال البريد والرمز وكلمة المرور الجديدة')),
       );
       return;
     }
 
     setState(() => _isLoading = true);
-    final result = await ApiService.resetPassword(email, newPassword);
+    final result = await ApiService.resetPasswordWithCode(
+      email: email,
+      code: code,
+      newPassword: newPassword,
+    );
     if (!mounted) return;
     setState(() => _isLoading = false);
 
@@ -56,6 +79,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            OtpNotificationHint(
+              onFill: (code) => _codeController.text = code,
+            ),
+            const SizedBox(height: 12),
             const Text(
               'أدخل بريدك وكلمة المرور الجديدة',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
@@ -68,6 +95,20 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               decoration: InputDecoration(
                 labelText: 'البريد الإلكتروني',
                 prefixIcon: const Icon(Icons.email_outlined),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // رمز التحقق (OTP)
+            TextField(
+              controller: _codeController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'رمز التحقق (OTP)',
+                prefixIcon: const Icon(Icons.verified_outlined),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),

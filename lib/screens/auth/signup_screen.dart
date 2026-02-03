@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:healthcare_flutter_app/services/api_service.dart';
+import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -112,8 +113,9 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = true);
 
     bool success = false;
+    String message = '';
     try {
-      success = await ApiService.register(
+      final res = await ApiService.registerDetailed(
         firstName: firstName,
         lastName: lastName,
         email: email,
@@ -123,6 +125,8 @@ class _SignupScreenState extends State<SignupScreen> {
         role: _role, // Patient/Doctor
         specialty: isDoctor ? specialty : null,
       );
+      success = res?['ok'] == true;
+      message = (res?['message'] ?? '').toString().trim();
     } catch (_) {
       success = false;
     }
@@ -131,15 +135,24 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = false);
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Registration successful! ✅')),
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.registerSuccess,
+        (_) => false,
+        arguments: {
+          'name': fullName,
+          'role': _role,
+          'autoLoggedIn': false,
+          'message': message,
+        },
       );
-
-      // ✅ بدل pop فقط: يرجع لصفحة تسجيل الدخول بشكل واضح
-      Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to register ❌')),
+        SnackBar(
+          content: Text(
+            message.isNotEmpty ? message : 'Failed to register ❌',
+          ),
+        ),
       );
     }
   }

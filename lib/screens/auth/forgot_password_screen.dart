@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:healthcare_flutter_app/services/api_service.dart';
 import 'package:healthcare_flutter_app/core/routes/app_routes.dart';
+import 'package:healthcare_flutter_app/widgets/otp_notification_hint.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -35,7 +36,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
       ),
     );
-    Navigator.pushNamed(context, AppRoutes.resetPassword);
+    Navigator.pushNamed(
+      context,
+      AppRoutes.resetPassword,
+      arguments: {'email': email},
+    );
   }
 
   @override
@@ -51,6 +56,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const OtpNotificationHint(),
+            const SizedBox(height: 12),
             const Text(
               'أدخل بريدك الإلكتروني لإرسال رمز الاستعادة',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),

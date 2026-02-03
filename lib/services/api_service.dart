@@ -301,7 +301,7 @@ class ApiService {
       role: role,
       specialty: specialty,
     );
-    return res != null;
+    return res?['ok'] == true;
   }
 
   /// ✅ نسخة “تفصيلية” (جديدة) ترجع Response Map إذا احتجتها
@@ -349,12 +349,18 @@ class ApiService {
       final res = await _post("/register", body: body);
       final data = _tryDecode(res.body);
 
-      if ((res.statusCode == 200 || res.statusCode == 201) && data is Map) {
-        return Map<String, dynamic>.from(data);
-      }
-      if (data is Map) return Map<String, dynamic>.from(data);
+      final map = <String, dynamic>{
+        "statusCode": res.statusCode,
+        "ok": res.statusCode == 200 || res.statusCode == 201,
+      };
 
-      return null;
+      if (data is Map) {
+        map.addAll(Map<String, dynamic>.from(data));
+      } else if (data != null) {
+        map["message"] = data.toString();
+      }
+
+      return map;
     } catch (_) {
       return null;
     }

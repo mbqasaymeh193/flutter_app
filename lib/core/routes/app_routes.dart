@@ -119,6 +119,7 @@ class AppRoutes {
             name: args?['name'],
             role: args?['role'],
             autoLoggedIn: args?['autoLoggedIn'] ?? true,
+            message: args?['message']?.toString(),
           ),
         );
       }
