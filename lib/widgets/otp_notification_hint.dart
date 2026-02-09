@@ -19,12 +19,12 @@ class OtpNotificationHint extends StatefulWidget {
 class _OtpNotificationHintState extends State<OtpNotificationHint> {
   String? _code;
   bool _visible = true;
-  bool _loading = false;
+  bool _loading = false;  
   Timer? _autoHide;
   late final VoidCallback _itemsListener;
 
   @override
-  void initState() {
+  void initState() { 
     super.initState();
     _itemsListener = _handleItemsChanged;
     NotificationStore.instance.items.addListener(_itemsListener);
