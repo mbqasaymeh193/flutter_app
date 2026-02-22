@@ -8,7 +8,7 @@ class AdminHomeShell extends StatefulWidget {
   final int initialTab;
 
   const AdminHomeShell({super.key, this.initialTab = 0});
-
+ // ✅ مهم: لدعم AppRoutes (initialTab) 
   @override
   State<AdminHomeShell> createState() => _AdminHomeShellState();
 }

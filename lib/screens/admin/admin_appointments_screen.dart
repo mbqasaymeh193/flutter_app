@@ -7,12 +7,12 @@ class AdminAppointmentsScreen extends StatefulWidget {
   @override
   State<AdminAppointmentsScreen> createState() => _AdminAppointmentsScreenState();
 }
-
+ 
 class _AdminAppointmentsScreenState extends State<AdminAppointmentsScreen> {
   List<dynamic>? appointments;
   bool isLoading = true;
 
-  @override
+  @override 
   void initState() {
     super.initState();
     _fetchAppointments();

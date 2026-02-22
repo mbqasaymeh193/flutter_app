@@ -20,7 +20,7 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
   }
 
   Future<void> _boot() async {
-    // تأخير بسيط لعرض Splash بشكل لطيف
+    // تأخير بسيط لعرض Splash بشكل لطيف k
     await Future.delayed(const Duration(milliseconds: 250));
 
     // 1) حمّل التوكن (من prefs إلى ApiService.token)
